@@ -1,0 +1,59 @@
+name: Deploy to Shopware 6
+
+on:
+  workflow_call:
+    inputs:
+      remote_host:
+        required: true
+        type: string
+      remote_user:
+        required: true
+        type: string
+      remote_pwd:
+        required: true
+        type: string
+      target_path:
+        required: true
+        type: string
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+
+    - name: Get latest tag
+      id: latest_tag
+      uses: actions-ecosystem/action-get-latest-tag@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Install jq
+      run: sudo apt-get update && sudo apt-get install -y jq
+
+    - name: Update version in composer.json
+      run: jq '.version = "${{ steps.latest_tag.outputs.tag }}"' composer.json > composer.tmp.json && mv composer.tmp.json composer.json
+
+    - name: Remove unnecessary files
+      run: rm -rf README.md .git* .eslint* .env* .prettier*
+
+    - name: Deployment to temporary directory
+      uses: appleboy/scp-action@master
+      with:
+          HOST: ${{ inputs.remote_host }}
+          PORT: 22
+          USERNAME: ${{ inputs.remote_user }}
+          password: ${{ inputs.remote_pwd }}
+          target: ${{ inputs.target_path }}/ci_temp/${{ github.event.repository.name }}
+          source: ./*
+          strip_components: 0
+
+    - name: Replace old directory with new one
+      uses: appleboy/ssh-action@master
+      with:
+        host: ${{ inputs.remote_host }}
+        username: ${{ inputs.remote_user }}
+        password: ${{ inputs.remote_pwd }}
+        script: |
+          rm -rf ${{ inputs.target_path }}/custom/plugins/${{ github.event.repository.name }}
+          mv ${{ inputs.target_path }}/ci_temp/${{ github.event.repository.name }} ${{ inputs.target_path }}/custom/plugins/${{ github.event.repository.name }}
