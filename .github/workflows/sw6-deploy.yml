@@ -31,10 +31,10 @@ jobs:
     - name: Install jq
       run: sudo apt-get update && sudo apt-get install -y jq
 
-    - name: Decrypt remote password
+    - name: Decode remote password
       run: |
-        decrypted_pwd=$(echo -n "${{ inputs.encrypted_remote_pwd }}" | openssl enc -aes-256-cbc -d -base64 -pass pass:myencryptionkey)
-        echo "DECRYPTED_REMOTE_PWD=$decrypted_pwd" >> $GITHUB_ENV
+        decoded_pwd=$(echo -n "${{ inputs.encoded_remote_pwd }}" | base64 --decode)
+        echo "DECODED_REMOTE_PWD=$decoded_pwd" >> $GITHUB_ENV
 
     - name: Update version in composer.json
       run: jq '.version = "${{ steps.latest_tag.outputs.tag }}"' composer.json > composer.tmp.json && mv composer.tmp.json composer.json
