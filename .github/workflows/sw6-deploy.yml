@@ -22,6 +22,12 @@ jobs:
     steps:
     - uses: actions/checkout@v2
 
+    - name: Debug Variables
+      run: |
+        echo "Remote Host: ${{ inputs.remote_host }}"
+        echo "Remote User: ${{ inputs.remote_user }}"
+        echo "Target Path: ${{ inputs.target_path }}"
+
     - name: Get latest tag
       id: latest_tag
       uses: actions-ecosystem/action-get-latest-tag@v1
