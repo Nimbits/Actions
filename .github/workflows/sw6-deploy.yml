@@ -9,7 +9,7 @@ on:
       remote_user:
         required: true
         type: string
-      remote_pwd:
+      encrypted_remote_pwd:
         required: true
         type: string
       target_path:
@@ -31,6 +31,11 @@ jobs:
     - name: Install jq
       run: sudo apt-get update && sudo apt-get install -y jq
 
+    - name: Decrypt remote password
+      run: |
+        decrypted_pwd=$(echo -n "${{ inputs.encrypted_remote_pwd }}" | openssl enc -aes-256-cbc -d -base64 -pass pass:myencryptionkey)
+        echo "DECRYPTED_REMOTE_PWD=$decrypted_pwd" >> $GITHUB_ENV
+
     - name: Update version in composer.json
       run: jq '.version = "${{ steps.latest_tag.outputs.tag }}"' composer.json > composer.tmp.json && mv composer.tmp.json composer.json
 
@@ -43,7 +48,7 @@ jobs:
           HOST: ${{ inputs.remote_host }}
           PORT: 22
           USERNAME: ${{ inputs.remote_user }}
-          password: ${{ inputs.remote_pwd }}
+          password: ${{ env.DECRYPTED_REMOTE_PWD }}
           target: ${{ inputs.target_path }}/ci_temp/${{ github.event.repository.name }}
           source: ./*
           strip_components: 0
@@ -53,7 +58,7 @@ jobs:
       with:
         host: ${{ inputs.remote_host }}
         username: ${{ inputs.remote_user }}
-        password: ${{ inputs.remote_pwd }}
+        password: ${{ env.DECRYPTED_REMOTE_PWD }}
         script: |
           rm -rf ${{ inputs.target_path }}/custom/plugins/${{ github.event.repository.name }}
           mv ${{ inputs.target_path }}/ci_temp/${{ github.event.repository.name }} ${{ inputs.target_path }}/custom/plugins/${{ github.event.repository.name }}
