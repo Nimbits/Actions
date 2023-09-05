@@ -43,10 +43,10 @@ jobs:
     - name: Deployment to temporary directory
       uses: appleboy/scp-action@master
       with:
-          HOST: ${{ inputs.remote_host }}
+          HOST: ${{ secrets.REMOTE_HOST }}
           PORT: 22
-          USERNAME: ${{ inputs.remote_user }}
-          password: ${{ inputs.remote_pwd }}
+          USERNAME: ${{ secrets.REMOTE_USER }}
+          PASSWORD: ${{ secrets.REMOTE_PWD }}
           target: ${{ inputs.target_path }}/ci_temp/${{ github.event.repository.name }}
           source: ./files_to_include.txt
           strip_components: 0
