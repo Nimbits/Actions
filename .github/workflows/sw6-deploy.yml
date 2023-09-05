@@ -40,23 +40,16 @@ jobs:
     - name: Create list of files to include
       run: ls -A1 | grep -v -F -f files_to_exclude.txt > files_to_include.txt
 
-    - name: Deployment to temporary directory
-      uses: appleboy/scp-action@master
-      with:
-          HOST: ${{ secrets.REMOTE_HOST }}
-          PORT: 22
-          USERNAME: ${{ secrets.REMOTE_USER }}
-          PASSWORD: ${{ secrets.REMOTE_PWD }}
-          target: ${{ inputs.target_path }}/ci_temp/${{ github.event.repository.name }}
-          source: ./files_to_include.txt
-          strip_components: 0
-
-    - name: Replace old directory with new one
+    - name: Deployment to temporary directory and replace old directory
       uses: appleboy/ssh-action@master
       with:
         host: ${{ inputs.remote_host }}
         username: ${{ inputs.remote_user }}
         password: ${{ inputs.remote_pwd }}
         script: |
+          # SCP files to temporary directory
+          scp files_to_include.txt ${{ inputs.remote_user }}@${{ inputs.remote_host }}:${{ inputs.target_path }}/ci_temp/${{ github.event.repository.name }}
+          
+          # Replace old directory with new one
           rm -rf ${{ inputs.target_path }}/custom/plugins/${{ github.event.repository.name }}
           mv ${{ inputs.target_path }}/ci_temp/${{ github.event.repository.name }} ${{ inputs.target_path }}/custom/plugins/${{ github.event.repository.name }}
