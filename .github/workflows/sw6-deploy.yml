@@ -48,7 +48,7 @@ jobs:
           port: 22
           username: ${{ inputs.remote_user }}
           password: ${{ secrets.REMOTE_PWD }}
-          target: ${{ vars.PATH }}/ci_temp/${{ github.event.repository.name }}
+          target: ${{ inputs.target_path }}/ci_temp/${{ github.event.repository.name }}
           source: ./*
           strip_components: 0
 
@@ -60,5 +60,5 @@ jobs:
         username: ${{ inputs.remote_user }}
         password: ${{ secrets.REMOTE_PWD }}
         script: |
-          rm -rf ${{ vars.PATH }}/custom/plugins/${{ github.event.repository.name }}
-          mv ${{ vars.PATH }}/ci_temp/${{ github.event.repository.name }} ${{ vars.PATH }}/custom/plugins/${{ github.event.repository.name }}
+          rm -rf ${{ inputs.target_path }}/custom/plugins/${{ github.event.repository.name }}
+          mv ${{ inputs.target_path }}/ci_temp/${{ github.event.repository.name }} ${{ inputs.target_path }}/custom/plugins/${{ github.event.repository.name }}
