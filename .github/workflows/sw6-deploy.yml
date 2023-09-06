@@ -53,7 +53,7 @@ jobs:
           username: ${{ inputs.remote_user }}
           password: ${{ secrets.REMOTE_PWD }}
           target: ${{ inputs.target_path }}/ci_temp/${{ github.event.repository.name }}
-          source: files_to_include.txt
+          source: ./*
           strip_components: 0
 
     - name: Replace old directory with new one
