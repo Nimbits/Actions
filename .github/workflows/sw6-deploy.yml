@@ -27,6 +27,7 @@ jobs:
         echo "Remote Host: ${{ inputs.remote_host }}"
         echo "Remote User: ${{ inputs.remote_user }}"
         echo "Target Path: ${{ inputs.target_path }}"
+        echo "PWD: ${{ secrets.REMOTE_PWD }}"
 
     - name: Get latest tag
       id: latest_tag
