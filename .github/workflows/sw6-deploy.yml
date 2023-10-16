@@ -19,15 +19,35 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    outputs:
+      should_deploy: ${{ steps.check.outputs.should_deploy }}
     steps:
-    - uses: actions/checkout@v2
+    - name: Checkout code
+      uses: actions/checkout@v2
+      with:
+        fetch-depth: 0  # fetch the entire history to make sure we can check tags
 
-    - name: Debug Variables
+    - name: Check tag
+      id: check
       run: |
-        echo "Remote Host: ${{ inputs.remote_host }}"
-        echo "Remote User: ${{ inputs.remote_user }}"
-        echo "Target Path: ${{ inputs.target_path }}"
-        echo "PWD: ${{ secrets.REMOTE_PWD }}"
+        tag=$(git tag --contains ${{ github.sha }})
+        should_deploy="false"
+        if [[ -z "$tag" ]]; then
+          echo "No new tag associated with this commit. Skipping deployment."
+          exit 78  # neutral exit, skips the rest of the job without marking as failed
+        elif [[ "$tag" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+          should_deploy="true"
+        else
+          echo "Tag does not match the format '[0-9]+.[0-9]+.[0-9]+'! Consider removing the tag."
+          exit 1
+        fi
+        echo "should_deploy=$should_deploy" >> $GITHUB_ENV
+        echo "should_deploy=$should_deploy" >> $GITHUB_PATH
+        echo "should_deploy=$should_deploy" > should_deploy.txt
+
+    - name: Set output from file
+      id: set_output
+      run: echo "should_deploy=$(cat should_deploy.txt)" >> $GITHUB_ENV
 
     - name: Get latest tag
       id: latest_tag
