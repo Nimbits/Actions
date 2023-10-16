@@ -1,0 +1,90 @@
+name: 'Shopware Release Action'
+description: 'Creates a release based on the latest tag and attaches a zip for Shopware 6'
+inputs:
+  github-token:
+    description: 'GitHub token'
+    required: true
+  repository-name:
+    description: 'Repository name'
+    required: true
+runs:
+  using: 'composite'
+  steps:
+    - name: Checkout code
+      uses: actions/checkout@v2
+      with:
+        fetch-depth: 0  # fetch the entire history to make sure we can check tags
+
+    - name: Check tag
+      run: |
+        tag=$(git tag --contains ${{ github.sha }})
+        if [[ -z "$tag" ]]; then
+          echo "No new tag associated with this commit. Exiting."
+          exit 1
+        fi
+        if [[ ! "$tag" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+          echo "Tag does not match the format '[0-9]+.[0-9]+.[0-9]+'. Exiting."
+          exit 1
+        fi
+      shell: bash
+
+    - name: Get latest tag
+      id: latest_tag
+      uses: actions-ecosystem/action-get-latest-tag@v1
+      env:
+        GITHUB_TOKEN: ${{ inputs.github-token }}
+
+    - name: Install jq
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y jq
+      shell: bash
+
+    - name: Update version in composer.json
+        run: |
+          jq '.version = "${{ steps.latest_tag.outputs.tag }}"' composer.json > composer.tmp.json
+          mv composer.tmp.json composer.json
+
+      - name: Install shopware-cli
+        run: |
+          wget https://github.com/Nimbits/Actions/raw/master/bin/shopware-cli_Linux_x86_64.tar.gz
+          tar xzf shopware-cli_Linux_x86_64.tar.gz
+          chmod +x shopware-cli
+
+      - name: Build & create zip
+        run: |
+          ./shopware-cli extension zip --git-commit $(git rev-parse HEAD) .
+          mkdir ${{ github.event.repository.name }}
+          mkdir temp
+          [ -f shopware-cli_Linux_x86_64.tar.gz ] && mv shopware-cli_Linux_x86_64.tar.gz temp/
+          [ -f shopware-cli ] && mv shopware-cli temp/
+          [ -f GithubActionTest-*.zip ] && mv GithubActionTest-*.zip temp/
+          [ -d completions ] && mv completions temp/
+          [ -d .github ] && mv .github temp/
+          [ -f CHANGELOG.md ] && mv CHANGELOG.md temp/
+          [ -f README.md  ] && mv README.md temp/
+          [ -f .gitignore ] && mv .gitignore temp/
+          find . -maxdepth 1 ! -name ${{ github.event.repository.name }} ! -name temp -exec mv {} ${{ github.event.repository.name }} \;
+          zip -r ${{ github.event.repository.name }}.zip ${{ github.event.repository.name }}
+
+
+      - name: Create Release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ steps.latest_tag.outputs.tag }}
+          release_name: ${{ steps.latest_tag.outputs.tag }}
+          draft: false
+          prerelease: false
+
+    - name: Upload Release Asset
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ inputs.github-token }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: ./${{ inputs.repository-name }}.zip
+        asset_name: ${{ inputs.repository-name }}.zip
+        asset_content_type: application/zip
