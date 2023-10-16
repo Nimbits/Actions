@@ -34,7 +34,6 @@ jobs:
         should_deploy="false"
         if [[ -z "$tag" ]]; then
           echo "No new tag associated with this commit. Skipping deployment."
-          exit 78  # neutral exit, skips the rest of the job without marking as failed
         elif [[ "$tag" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
           should_deploy="true"
         else
@@ -46,26 +45,32 @@ jobs:
         echo "should_deploy=$should_deploy" > should_deploy.txt
 
     - name: Set output from file
+      if: env.should_deploy == 'true'
       id: set_output
       run: echo "should_deploy=$(cat should_deploy.txt)" >> $GITHUB_ENV
 
     - name: Get latest tag
+      if: env.should_deploy == 'true'
       id: latest_tag
       uses: actions-ecosystem/action-get-latest-tag@v1
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
     - name: Install jq
+      if: env.should_deploy == 'true'
       run: sudo apt-get update && sudo apt-get install -y jq
 
     - name: Update version in composer.json
+      if: env.should_deploy == 'true'
       run: jq '.version = "${{ steps.latest_tag.outputs.tag }}"' composer.json > composer.tmp.json && mv composer.tmp.json composer.json
 
     - name: Remove unnecessary files
+      if: env.should_deploy == 'true'
       run: |
         rm -rf README.md .git* .eslint* .env* .prettier*
 
     - name: Deployment to temporary directory
+      if: env.should_deploy == 'true'
       uses: appleboy/scp-action@master
       with:
           host: ${{ inputs.remote_host }}
@@ -77,6 +82,7 @@ jobs:
           strip_components: 0
 
     - name: Replace old directory with new one
+      if: env.should_deploy == 'true'
       uses: appleboy/ssh-action@master
       with:
         host: ${{ inputs.remote_host }}
