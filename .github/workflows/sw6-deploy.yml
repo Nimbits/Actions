@@ -42,24 +42,19 @@ jobs:
         fi
         echo "should_deploy=$should_deploy" >> $GITHUB_ENV
         echo "should_deploy=$should_deploy" >> $GITHUB_PATH
-        echo "should_deploy=$should_deploy" > should_deploy.txt
         echo "Deployment status: $should_deploy"   # Add this for debugging
 
-    - name: Set output from file
-      if: env.should_deploy == 'true'
-      id: set_output
-      run: echo "should_deploy=$(cat should_deploy.txt)" >> $GITHUB_ENV
-
     - name: Get latest tag
-      if: env.should_deploy == 'true'
       id: latest_tag
       uses: actions-ecosystem/action-get-latest-tag@v1
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
     - name: Install jq
-      if: env.should_deploy == 'true'
-      run: sudo apt-get update && sudo apt-get install -y jq
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y jq
+        echo "Deployment status: ${{ env.should_deploy }}"
 
     - name: Update version in composer.json
       if: env.should_deploy == 'true'
