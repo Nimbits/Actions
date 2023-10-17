@@ -19,51 +19,38 @@ jobs:
         with:
           fetch-depth: 0  # fetch the entire history to make sure we can check tags
 
-      - name: Check tag
-        id: check
+      - name: Check branch
+        id: check_branch
         run: |
-          tag=$(git tag --contains ${{ github.sha }})
-          new_release="false"
-          if [[ -z "$tag" ]]; then
-            echo "No new tag associated with this commit. Skipping deployment."
-          elif [[ "$tag" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-            new_release="true"
-          else
-            echo "Tag does not match the format '[0-9]+.[0-9]+.[0-9]+'! Consider removing the tag."
+          if [[ "${{ github.ref }}" != "refs/heads/master" && "${{ github.ref }}" != "refs/heads/main" ]]; then
+            echo "Not on the 'master' or 'main' branch. Exiting."
             exit 1
           fi
-          echo "new_release=$new_release" >> $GITHUB_ENV
-          echo "new_release=$new_release" >> $GITHUB_PATH
   
       - name: Get latest tag
-        if: env.new_release == 'true'
         id: latest_tag
         uses: actions-ecosystem/action-get-latest-tag@v1
         env:
           GITHUB_TOKEN: ${{ inputs.github-token }}
   
       - name: Install jq
-        if: env.new_release == 'true'
         run: |
           sudo apt-get update
           sudo apt-get install -y jq
         shell: bash
   
       - name: Update version in composer.json
-        if: env.new_release == 'true'
         run: |
           jq '.version = "${{ steps.latest_tag.outputs.tag }}"' composer.json > composer.tmp.json
           mv composer.tmp.json composer.json
   
       - name: Install shopware-cli
-        if: env.new_release == 'true'
         run: |
           wget https://github.com/Nimbits/Actions/raw/master/bin/shopware-cli_Linux_x86_64.tar.gz
           tar xzf shopware-cli_Linux_x86_64.tar.gz
           chmod +x shopware-cli
   
       - name: Build & create zip
-        if: env.new_release == 'true'
         run: |
           ./shopware-cli extension zip --git-commit $(git rev-parse HEAD) .
           mkdir ${{ github.event.repository.name }}
@@ -81,7 +68,6 @@ jobs:
   
   
       - name: Create Release
-        if: env.new_release == 'true'
         id: create_release
         uses: actions/create-release@v1
         env:
@@ -93,7 +79,6 @@ jobs:
           prerelease: false
   
       - name: Upload Release Asset
-        if: env.new_release == 'true'
         uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.github-token }}
