@@ -23,48 +23,47 @@ jobs:
         id: check
         run: |
           tag=$(git tag --contains ${{ github.sha }})
-          should_deploy="false"
+          new_release="false"
           if [[ -z "$tag" ]]; then
             echo "No new tag associated with this commit. Skipping deployment."
           elif [[ "$tag" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-            should_deploy="true"
+            new_release="true"
           else
             echo "Tag does not match the format '[0-9]+.[0-9]+.[0-9]+'! Consider removing the tag."
             exit 1
           fi
-          echo "should_deploy=$should_deploy" >> $GITHUB_ENV
-          echo "should_deploy=$should_deploy" >> $GITHUB_PATH
-          echo "should_deploy=$should_deploy" > should_deploy.txt
+          echo "new_release=$new_release" >> $GITHUB_ENV
+          echo "new_release=$new_release" >> $GITHUB_PATH
   
       - name: Get latest tag
-        if: env.should_deploy == 'true'
+        if: env.new_release == 'true'
         id: latest_tag
         uses: actions-ecosystem/action-get-latest-tag@v1
         env:
           GITHUB_TOKEN: ${{ inputs.github-token }}
   
       - name: Install jq
-        if: env.should_deploy == 'true'
+        if: env.new_release == 'true'
         run: |
           sudo apt-get update
           sudo apt-get install -y jq
         shell: bash
   
       - name: Update version in composer.json
-        if: env.should_deploy == 'true'
+        if: env.new_release == 'true'
         run: |
           jq '.version = "${{ steps.latest_tag.outputs.tag }}"' composer.json > composer.tmp.json
           mv composer.tmp.json composer.json
   
       - name: Install shopware-cli
-        if: env.should_deploy == 'true'
+        if: env.new_release == 'true'
         run: |
           wget https://github.com/Nimbits/Actions/raw/master/bin/shopware-cli_Linux_x86_64.tar.gz
           tar xzf shopware-cli_Linux_x86_64.tar.gz
           chmod +x shopware-cli
   
       - name: Build & create zip
-        if: env.should_deploy == 'true'
+        if: env.new_release == 'true'
         run: |
           ./shopware-cli extension zip --git-commit $(git rev-parse HEAD) .
           mkdir ${{ github.event.repository.name }}
@@ -82,7 +81,7 @@ jobs:
   
   
       - name: Create Release
-        if: env.should_deploy == 'true'
+        if: env.new_release == 'true'
         id: create_release
         uses: actions/create-release@v1
         env:
@@ -94,7 +93,7 @@ jobs:
           prerelease: false
   
       - name: Upload Release Asset
-        if: env.should_deploy == 'true'
+        if: env.new_release == 'true'
         uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.github-token }}
