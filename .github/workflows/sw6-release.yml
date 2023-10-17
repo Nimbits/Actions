@@ -57,15 +57,14 @@ jobs:
           mkdir temp
           [ -f shopware-cli_Linux_x86_64.tar.gz ] && mv shopware-cli_Linux_x86_64.tar.gz temp/
           [ -f shopware-cli ] && mv shopware-cli temp/
-          [ -f GithubActionTest-*.zip ] && mv GithubActionTest-*.zip temp/
+          [ -f ${{ github.event.repository.name }}-*.zip ] && mv ${{ github.event.repository.name }}-*.zip temp/  # Changed here
           [ -d completions ] && mv completions temp/
           [ -d .github ] && mv .github temp/
           [ -f CHANGELOG.md ] && mv CHANGELOG.md temp/
           [ -f README.md  ] && mv README.md temp/
           [ -f .gitignore ] && mv .gitignore temp/
           find . -maxdepth 1 ! -name ${{ github.event.repository.name }} ! -name temp -exec mv {} ${{ github.event.repository.name }} \;
-          zip -r ${{ github.event.repository.name }}.zip ${{ github.event.repository.name }}
-  
+          zip -r ${{ github.event.repository.name }}.zip ${{ github.event.repository.name }}  
   
       - name: Create Release
         id: create_release
