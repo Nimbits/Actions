@@ -1,0 +1,64 @@
+name: 'Shopware 6 Plugin Test'
+
+on:
+  workflow_call:
+    inputs:
+      php-version:
+        description: 'PHP version'
+        required: false
+        default: '8.2'
+        type: 'string'
+      php-extensions:
+        description: 'PHP extensions to install'
+        required: false
+        default: 'mbstring, dom, curl, libxml, xml, bcmath, json, zip, iconv, intl, pdo, pdo_mysql'
+        type: 'string'
+      coverage:
+        description: 'Code coverage tool'
+        required: false
+        default: 'none'
+        type: 'string'
+      phpstan-level:
+        description: 'PHPStan analysis level'
+        required: false
+        default: '5'
+        type: 'string'
+    outputs:
+      test-passed:
+        description: 'Indicates if tests passed'
+        value: ${{ jobs.test.outputs.test-passed }}
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    outputs:
+      test-passed: ${{ steps.phpunit.outputs.test-passed }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ inputs.php-version }}
+          extensions: ${{ inputs.php-extensions }}
+          coverage: ${{ inputs.coverage }}
+
+      - name: Validate composer.json and composer.lock
+        run: composer validate --strict
+
+      - name: Install Dependencies
+        run: composer install --prefer-dist --no-scripts --no-progress --no-interaction
+
+      - name: Run phpstan
+        run: vendor/bin/phpstan analyse src --level ${{ inputs.phpstan-level }}
+
+      - name: Run phpunit
+        id: phpunit
+        run: |
+          if vendor/bin/phpunit Tests/; then
+            echo "test-passed=true" >> $GITHUB_ENV
+          else
+            echo "test-passed=false" >> $GITHUB_ENV
+          fi
