@@ -35,7 +35,6 @@ jobs:
           echo "should_deploy=$should_deploy" >> $GITHUB_ENV
           echo "should_deploy=$should_deploy" >> $GITHUB_PATH
           echo "should_deploy=$should_deploy" > should_deploy.txt
-          echo "Deployment status: $should_deploy"   # Add this for debugging
   
       - name: Get latest tag
         if: env.should_deploy == 'true'
@@ -68,18 +67,18 @@ jobs:
         if: env.should_deploy == 'true'
         run: |
           ./shopware-cli extension zip --git-commit $(git rev-parse HEAD) .
-          mkdir ${{ inputs.repository-name }}
+          mkdir ${{ github.event.repository.name }}
           mkdir temp
           [ -f shopware-cli_Linux_x86_64.tar.gz ] && mv shopware-cli_Linux_x86_64.tar.gz temp/
           [ -f shopware-cli ] && mv shopware-cli temp/
-          [ -f ${{ inputs.repository-name }}-*.zip ] && mv ${{ inputs.repository-name }}-*.zip temp/
+          [ -f GithubActionTest-*.zip ] && mv GithubActionTest-*.zip temp/
           [ -d completions ] && mv completions temp/
           [ -d .github ] && mv .github temp/
           [ -f CHANGELOG.md ] && mv CHANGELOG.md temp/
           [ -f README.md  ] && mv README.md temp/
           [ -f .gitignore ] && mv .gitignore temp/
-          find . -maxdepth 1 ! -name ${{ inputs.repository-name }} ! -name temp -exec mv {} ${{ inputs.repository-name }} \;
-          zip -r ${{ inputs.repository-name }}.zip ${{ inputs.repository-name }}
+          find . -maxdepth 1 ! -name ${{ github.event.repository.name }} ! -name temp -exec mv {} ${{ github.event.repository.name }} \;
+          zip -r ${{ github.event.repository.name }}.zip ${{ github.event.repository.name }}
   
   
       - name: Create Release
@@ -101,6 +100,6 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.github-token }}
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ./${{ inputs.repository-name }}.zip
+          asset_path: ./${{ github.event.repository.name }}.zip
           asset_name: ${{ inputs.repository-name }}.zip
           asset_content_type: application/zip
