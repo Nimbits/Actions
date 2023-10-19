@@ -88,3 +88,14 @@ jobs:
         script: |
           rm -rf ${{ inputs.target_path }}/custom/plugins/${{ github.event.repository.name }}
           mv ${{ inputs.target_path }}/ci_temp/${{ github.event.repository.name }} ${{ inputs.target_path }}/custom/plugins/${{ github.event.repository.name }}
+    
+    - name: Clear Cache & Compile
+      if: env.should_deploy == 'true'
+      uses: appleboy/ssh-action@master
+      with:
+        host: ${{ inputs.remote_host }}
+        port: 22
+        username: ${{ inputs.remote_user }}
+        password: ${{ secrets.REMOTE_PWD }}
+        script: |
+          cd ${{ inputs.target_path }} & bin/console cache:clear & bin/console theme:compile & bin/console assets:install
