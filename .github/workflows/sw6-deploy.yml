@@ -102,3 +102,5 @@ jobs:
           bin/console cache:clear
           bin/console theme:compile
           bin/console assets:install
+
+  # todo: add https://github.com/marketplace/actions/microsoft-teams-notification 
