@@ -89,7 +89,7 @@ jobs:
           rm -rf ${{ inputs.target_path }}/custom/plugins/${{ github.event.repository.name }}
           mv ${{ inputs.target_path }}/ci_temp/${{ github.event.repository.name }} ${{ inputs.target_path }}/custom/plugins/${{ github.event.repository.name }}
     
-    - name: Clear Cache & Compile
+    - name: Clear Cache & Theme compile & Assets install
       if: env.should_deploy == 'true'
       uses: appleboy/ssh-action@master
       with:
@@ -98,4 +98,7 @@ jobs:
         username: ${{ inputs.remote_user }}
         password: ${{ secrets.REMOTE_PWD }}
         script: |
-          cd ${{ inputs.target_path }} & bin/console cache:clear & bin/console theme:compile & bin/console assets:install
+          cd ${{ inputs.target_path }}
+          bin/console cache:clear
+          bin/console theme:compile
+          bin/console assets:install
