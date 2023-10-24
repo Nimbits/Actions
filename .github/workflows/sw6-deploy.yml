@@ -12,6 +12,10 @@ on:
       target_path:
         required: true
         type: string
+      check_tag:
+        required: false
+        type: boolean
+        default: true
     secrets:
       REMOTE_PWD:
         required: true
@@ -30,6 +34,7 @@ jobs:
         fetch-depth: 0  # fetch the entire history to make sure we can check tags
 
     - name: Check tag
+      if: inputs.target_path == 'true'
       id: check
       run: |
         tag=$(git tag --contains ${{ github.sha }})
@@ -45,6 +50,14 @@ jobs:
         echo "should_deploy=$should_deploy" >> $GITHUB_ENV
         echo "should_deploy=$should_deploy" >> $GITHUB_PATH
         echo "Deployment status: $should_deploy"   # Add this for debugging
+
+    - name: Skip tag
+      if: inputs.target_path == 'false'
+      id: skip_tag
+      run: |
+        should_deploy="true"
+        echo "should_deploy=$should_deploy" >> $GITHUB_ENV
+        echo "should_deploy=$should_deploy" >> $GITHUB_PATH
 
     - name: Get latest tag
       id: latest_tag
