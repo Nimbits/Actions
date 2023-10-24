@@ -80,3 +80,13 @@ jobs:
           asset_path: ./${{ github.event.repository.name }}.zip
           asset_name: ${{ inputs.repository-name }}.zip
           asset_content_type: application/zip
+
+      - name: Notify teams on failure
+        if: failure()
+        uses: jdcargile/ms-teams-notification@v1.3
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          ms-teams-webhook-uri: ${{ secrets.MS_TEAMS_WEBHOOK_URI }}
+          notification-summary: 'Release failed!'
+          notification-color: 'F85149'  # Red 
+          timezone: Europe/Berlin
