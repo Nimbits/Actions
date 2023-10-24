@@ -9,6 +9,8 @@ on:
     secrets:
       github-token:
         required: true
+      MS_TEAMS_WEBHOOK_URI:
+        required: true
 
 jobs:
   build:
