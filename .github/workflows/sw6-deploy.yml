@@ -15,6 +15,8 @@ on:
     secrets:
       REMOTE_PWD:
         required: true
+      MS_TEAMS_WEBHOOK_URI:
+        required: true
 
 jobs:
   build:
@@ -103,4 +105,24 @@ jobs:
           bin/console theme:compile
           bin/console assets:install
 
-  # todo: add https://github.com/marketplace/actions/microsoft-teams-notification 
+    - name: Notify teams on success
+      if: success()
+      uses: jdcargile/ms-teams-notification@v1.3
+      with:
+        github-token: ${{ secrets.GITHUB_TOKEN }}
+        ms-teams-webhook-uri: ${{ secrets.MS_TEAMS_WEBHOOK_URI }}
+        notification-summary: 'Deployment successful!'
+        notification-color: '3FBA50' # Green
+        timezone: Europe/Berlin
+
+
+    - name: Notify teams on failure
+      if: failure()
+      uses: jdcargile/ms-teams-notification@v1.3
+      with:
+        github-token: ${{ secrets.GITHUB_TOKEN }}
+        ms-teams-webhook-uri: ${{ secrets.MS_TEAMS_WEBHOOK_URI }}
+        notification-summary: 'Deployment failed!'
+        notification-color: 'F85149'  # Red 
+        timezone: Europe/Berlin
+
