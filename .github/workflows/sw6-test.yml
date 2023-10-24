@@ -61,6 +61,7 @@ jobs:
             echo "test-passed=true" >> $GITHUB_ENV
           else
             echo "test-passed=false" >> $GITHUB_ENV
+            exit 1  # Set the exit code to indicate failure
           fi
 
       - name: Notify teams on failure
