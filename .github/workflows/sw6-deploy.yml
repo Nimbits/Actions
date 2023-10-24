@@ -34,7 +34,7 @@ jobs:
         fetch-depth: 0  # fetch the entire history to make sure we can check tags
 
     - name: Check tag
-      if: inputs.target_path == 'true'
+      if: inputs.check_tag == true
       id: check
       run: |
         tag=$(git tag --contains ${{ github.sha }})
@@ -52,7 +52,7 @@ jobs:
         echo "Deployment status: $should_deploy"   # Add this for debugging
 
     - name: Skip tag
-      if: inputs.target_path == 'false'
+      if: inputs.check_tag == false
       id: skip_tag
       run: |
         should_deploy="true"
@@ -119,7 +119,7 @@ jobs:
           bin/console assets:install
 
     - name: Notify teams on success
-      if: success() && env.should_deploy == 'true'
+      if: success() && env.should_deploy == 'true' && inputs.check_tag == true
       uses: jdcargile/ms-teams-notification@v1.3
       with:
         github-token: ${{ secrets.GITHUB_TOKEN }}
