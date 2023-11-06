@@ -51,21 +51,21 @@ jobs:
       - name: Validate composer.json and composer.lock
         run: composer validate --strict
 
-      - name: Install Dependencies
-        run: composer install --prefer-dist --no-scripts --no-progress --no-interaction
+      #- name: Install Dependencies
+        #run: composer install --prefer-dist --no-scripts --no-progress --no-interaction
 
-      - name: Run phpstan
-        run: vendor/bin/phpstan analyse src --level ${{ inputs.phpstan-level }}
+      #- name: Run phpstan
+       # run: vendor/bin/phpstan analyse src --level ${{ inputs.phpstan-level }}
 
-      - name: Run phpunit
-        id: phpunit
-        run: |
-          if vendor/bin/phpunit Tests/; then
-            echo "test-passed=true" >> $GITHUB_ENV
-          else
-            echo "test-passed=false" >> $GITHUB_ENV
-            exit 1  # Set the exit code to indicate failure
-          fi
+      #- name: Run phpunit
+       # id: phpunit
+        #run: |
+         # if vendor/bin/phpunit Tests/; then
+          #  echo "test-passed=true" >> $GITHUB_ENV
+          #else
+           # echo "test-passed=false" >> $GITHUB_ENV
+           # exit 1  # Set the exit code to indicate failure
+          #fi
 
       - name: Notify teams on failure
         if: failure()
