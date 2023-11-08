@@ -60,7 +60,7 @@ jobs:
         password: ${{ secrets.REMOTE_PWD }}
         script: |
           folder_name=${{ inputs.deployFolderName || github.event.repository.name }}
-          if [ ${{ inputs.is_theme }} == 1 ]; then
+          if [ ${{ inputs.is_theme }} == true ]; then
             deployment_path="${{ inputs.target_path }}/themes/Frontend/$folder_name"
           else
             deployment_path="${{ inputs.target_path }}/custom/plugins/$folder_name"
