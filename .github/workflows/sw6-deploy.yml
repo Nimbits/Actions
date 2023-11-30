@@ -82,7 +82,7 @@ jobs:
 
     - name: Deployment to temporary directory
       if: env.should_deploy == 'true'
-      uses: appleboy/scp-action@master
+      uses: appleboy/scp-action@v0.1.4
       with:
           host: ${{ inputs.remote_host }}
           port: 22
@@ -94,7 +94,7 @@ jobs:
 
     - name: Replace old directory with new one
       if: env.should_deploy == 'true'
-      uses: appleboy/ssh-action@master
+      uses: appleboy/ssh-action@v1.0.0
       with:
         host: ${{ inputs.remote_host }}
         port: 22
@@ -106,7 +106,7 @@ jobs:
     
     - name: Clear Cache & Theme compile & Assets install
       if: env.should_deploy == 'true'
-      uses: appleboy/ssh-action@master
+      uses: appleboy/ssh-action@v1.0.0
       with:
         host: ${{ inputs.remote_host }}
         port: 22
