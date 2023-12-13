@@ -4,14 +4,14 @@ on:
   workflow_call:
     inputs:
       vault_url:
-        required: true
+        required: false
         type: string
       secret_path:
-        required: true
+        required: false
         type: string
     secrets:
       vault_token:
-        required: true
+        required: false
     outputs:
       firstword:
         description: "The first output string"
