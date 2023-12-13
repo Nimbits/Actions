@@ -55,7 +55,7 @@ jobs:
             ${{ inputs.secret_path }} dev_path | DEV_PATH ;
 
       - id: set_outputs
-        run: echo "remote_host=${{ env.REMOTE_HOST }}" >> $GITHUB_OUTPUT
+        run: echo "remote_host=bob.nimbits-hosting.de" >> $GITHUB_OUTPUT
              echo "remote_user=${{ env.REMOTE_USER }}" >> $GITHUB_OUTPUT
              echo "remote_pwd=${{ env.REMOTE_PWD }}" >> $GITHUB_OUTPUT
              echo "ms_teams_webhook_uri=${{ env.MS_TEAMS_WEBHOOK_URI }}" >> $GITHUB_OUTPUT
