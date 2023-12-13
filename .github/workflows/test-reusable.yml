@@ -52,6 +52,22 @@ jobs:
           echo "Debug - Remote Host: ${{ env.LIVE_PATH }}"
           echo "Debug - Remote Host: ${{ env.DEV_PATH }}"
 
+      - name: Check if REMOTE_HOST equals stuff
+        run: |
+          if [ "${{ env.REMOTE_HOST }}" = "bob.nimbits-hosting.de" ]; then
+            echo "REMOTE_HOST matches the expected value."
+          else
+            echo "REMOTE_HOST does not match the expected value."
+          fi
+
+      - name: Check if DEV_PATH equals stuff
+        run: |
+          if [ "${{ env.DEV_PATH }}" = "/web/public/stagingQ" ]; then
+            echo "DEV_PATH matches the expected value."
+          else
+            echo "DEV_PATH does not match the expected value."
+          fi
+
       - name: Step following 'Import Secrets'
         run: |
           touch secrets.json
