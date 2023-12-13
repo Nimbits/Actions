@@ -37,7 +37,7 @@ jobs:
           method: token
           token: ${{ secrets.vault_token }}
           secrets: |
-            ${{ inputs.secret_path }} remote_host | REMOTE_HOST ;
+            ${{ inputs.secret_path }} remote_hostQ | REMOTE_HOST ;
             ${{ inputs.secret_path }} remote_user | REMOTE_USER ;
             ${{ inputs.secret_path }} remote_pwd | REMOTE_PWD ;
             ${{ inputs.secret_path }} ms_teams_webhook_uri | MS_TEAMS_WEBHOOK_URI ;
