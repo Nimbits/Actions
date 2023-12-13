@@ -43,6 +43,11 @@ jobs:
             ${{ inputs.secret_path }} ms_teams_webhook_uri | MS_TEAMS_WEBHOOK_URI ;
             ${{ inputs.secret_path }} live_path | LIVE_PATH ;
             ${{ inputs.secret_path }} dev_path | DEV_PATH ;
+
+      - name: Step following 'Import Secrets'
+        run: |
+          touch secrets.json
+          echo '${{ toJson(steps.fetch-secrets.outputs) }}' >> secrets.json
       - id: step1
         run: echo "firstword=${{ env.REMOTE_HOST }}" >> $GITHUB_OUTPUT
       - id: step2
