@@ -44,6 +44,6 @@ jobs:
             ${{ inputs.secret_path }} live_path | LIVE_PATH ;
             ${{ inputs.secret_path }} dev_path | DEV_PATH ;
       - id: step1
-        run: echo "firstword=${{ env.REMOTE_HOST }}" >> $GITHUB_OUTPUT
+        run: echo "firstword=hello" >> $GITHUB_OUTPUT
       - id: step2
         run: echo "secondword=world" >> $GITHUB_OUTPUT
