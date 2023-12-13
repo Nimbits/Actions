@@ -2,7 +2,16 @@ name: Return Test - Reusable workflow
 
 on:
   workflow_call:
-    # Map the workflow outputs to job outputs
+    inputs:
+      vault_url:
+        required: true
+        type: string
+      secret_path:
+        required: true
+        type: string
+    secrets:
+      vault_token:
+        required: true
     outputs:
       firstword:
         description: "The first output string"
@@ -12,7 +21,7 @@ on:
         value: ${{ jobs.example_job.outputs.output2 }}
 
 jobs:
-  example_job:
+  fetch_secrets:
     name: Generate output
     runs-on: ubuntu-latest
     # Map the job outputs to step outputs
@@ -20,7 +29,21 @@ jobs:
       output1: ${{ steps.step1.outputs.firstword }}
       output2: ${{ steps.step2.outputs.secondword }}
     steps:
+      - name: Fetch secrets from Vault
+        id: fetch-secrets
+        uses: hashicorp/vault-action@v2.3.0
+        with:
+          url: ${{ inputs.vault_url }}
+          method: token
+          token: ${{ secrets.vault_token }}
+          secrets: |
+            ${{ inputs.secret_path }} remote_host | REMOTE_HOST ;
+            ${{ inputs.secret_path }} remote_user | REMOTE_USER ;
+            ${{ inputs.secret_path }} remote_pwd | REMOTE_PWD ;
+            ${{ inputs.secret_path }} ms_teams_webhook_uri | MS_TEAMS_WEBHOOK_URI ;
+            ${{ inputs.secret_path }} live_path | LIVE_PATH ;
+            ${{ inputs.secret_path }} dev_path | DEV_PATH ;
       - id: step1
-        run: echo "firstword=hello" >> $GITHUB_OUTPUT
+        run: echo "firstword=${{ env.REMOTE_HOST }}" >> $GITHUB_OUTPUT
       - id: step2
         run: echo "secondword=world" >> $GITHUB_OUTPUT
