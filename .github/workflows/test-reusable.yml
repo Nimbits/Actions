@@ -44,6 +44,14 @@ jobs:
             ${{ inputs.secret_path }} live_path | LIVE_PATH ;
             ${{ inputs.secret_path }} dev_path | DEV_PATH ;
 
+      - name: Debug - Echo Fetched Secrets
+        run: |
+          echo "Debug - Remote Host: ${{ env.REMOTE_HOST }}"
+          echo "Debug - Remote Host: ${{ env.REMOTE_USER }}"
+          echo "Debug - Remote Host: ${{ env.MS_TEAMS_WEBHOOK_URI }}"
+          echo "Debug - Remote Host: ${{ env.LIVE_PATH }}"
+          echo "Debug - Remote Host: ${{ env.DEV_PATH }}"
+
       - name: Step following 'Import Secrets'
         run: |
           touch secrets.json
