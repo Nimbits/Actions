@@ -4,21 +4,27 @@ on:
   workflow_call:
     inputs:
       vault_url:
-        required: false
+        required: true
         type: string
       secret_path:
-        required: false
+        required: true
         type: string
     secrets:
       vault_token:
-        required: false
+        required: true
     outputs:
-      firstword:
-        description: "The first output string"
-        value: ${{ jobs.fetch_secrets.outputs.output1 }}
-      secondword:
-        description: "The second output string"
-        value: ${{ jobs.fetch_secrets.outputs.output2 }}
+      remote_host:
+        value: ${{ jobs.fetch_secrets.outputs.remote_host }}
+      remote_user:
+        value: ${{ jobs.fetch_secrets.outputs.remote_user }}
+      remote_pwd:
+        value: ${{ jobs.fetch_secrets.outputs.remote_pwd }}
+      ms_teams_webhook_uri:
+        value: ${{ jobs.fetch_secrets.outputs.ms_teams_webhook_uri }}
+      live_path:
+        value: ${{ jobs.fetch_secrets.outputs.live_path }}
+      dev_path:
+        value: ${{ jobs.fetch_secrets.outputs.dev_path }}
 
 jobs:
   fetch_secrets:
@@ -26,8 +32,12 @@ jobs:
     runs-on: ubuntu-latest
     # Map the job outputs to step outputs
     outputs:
-      output1: ${{ steps.step1.outputs.firstword }}
-      output2: ${{ steps.step2.outputs.secondword }}
+      remote_host: ${{ steps.set_outputs.outputs.remote_host }}
+      remote_user: ${{ steps.set_outputs.outputs.remote_user }}
+      remote_pwd: ${{ steps.set_outputs.outputs.remote_pwd }}
+      ms_teams_webhook_uri: ${{ steps.set_outputs.outputs.ms_teams_webhook_uri }}
+      live_path: ${{ steps.set_outputs.outputs.live_path }}
+      dev_path: ${{ steps.set_outputs.outputs.dev_path }}
     steps:
       - name: Fetch secrets from Vault
         id: fetch-secrets
@@ -44,39 +54,10 @@ jobs:
             ${{ inputs.secret_path }} live_path | LIVE_PATH ;
             ${{ inputs.secret_path }} dev_path | DEV_PATH ;
 
-      - name: Debug - Echo Fetched Secrets
-        run: |
-          echo "Debug - Remote Host: ${{ env.REMOTE_HOST }}"
-          echo "Debug - Remote Host: ${{ env.REMOTE_USER }}"
-          echo "Debug - Remote Host: ${{ env.MS_TEAMS_WEBHOOK_URI }}"
-          echo "Debug - Remote Host: ${{ env.LIVE_PATH }}"
-          echo "Debug - Remote Host: ${{ env.DEV_PATH }}"
-
-      - name: Check if REMOTE_HOST equals stuff
-        run: |
-          if [ "${{ env.REMOTE_HOST }}" = "bob.nimbits-hosting.de" ]; then
-            echo "REMOTE_HOST matches the expected value."
-          else
-            echo "REMOTE_HOST does not match the expected value."
-          fi
-
-      - name: Check if DEV_PATH equals stuff
-        run: |
-          if [ "${{ env.DEV_PATH }}" = "/web/public/stagingQ" ]; then
-            echo "DEV_PATH matches the expected value."
-          else
-            echo "DEV_PATH does not match the expected value."
-          fi
-
-      - name: Step following 'Import Secrets'
-        run: |
-          touch secrets.json
-          echo '${{ toJson(steps.fetch-secrets.outputs) }}' >> secrets.json
-
-      - name: Output secrets.json content
-        run: cat secrets.json
-
-      - id: step1
-        run: echo "firstword=${{ env.REMOTE_HOST }}" >> $GITHUB_OUTPUT
-      - id: step2
-        run: echo "secondword=${{ steps.fetch-secrets.outputs.REMOTE_HOST }}" >> $GITHUB_OUTPUT
+      - id: set_outputs
+        run: echo "remote_host=${{ env.REMOTE_HOST }}" >> $GITHUB_OUTPUT
+             echo "remote_user=${{ env.REMOTE_USER }}" >> $GITHUB_OUTPUT
+             echo "remote_pwd=${{ env.REMOTE_PWD }}" >> $GITHUB_OUTPUT
+             echo "ms_teams_webhook_uri=${{ env.MS_TEAMS_WEBHOOK_URI }}" >> $GITHUB_OUTPUT
+             echo "live_path=${{ env.LIVE_PATH }}" >> $GITHUB_OUTPUT
+             echo "dev_path=${{ env.DEV_PATH }}" >> $GITHUB_OUTPUT
