@@ -48,6 +48,10 @@ jobs:
         run: |
           touch secrets.json
           echo '${{ toJson(steps.fetch-secrets.outputs) }}' >> secrets.json
+
+      - name: Output secrets.json content
+        run: cat secrets.json
+
       - id: step1
         run: echo "firstword=${{ env.REMOTE_HOST }}" >> $GITHUB_OUTPUT
       - id: step2
