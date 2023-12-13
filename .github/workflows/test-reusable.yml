@@ -46,4 +46,4 @@ jobs:
       - id: step1
         run: echo "firstword=${{ env.REMOTE_HOST }}" >> $GITHUB_OUTPUT
       - id: step2
-        run: echo "secondword=world" >> $GITHUB_OUTPUT
+        run: echo "secondword=${{ steps.import-secrets.outputs.REMOTE_HOST }}" >> $GITHUB_OUTPUT
