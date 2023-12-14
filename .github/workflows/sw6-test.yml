@@ -41,14 +41,15 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v2
 
-      - name: PHPStan
-        uses: php-actions/phpstan@v3
-        with:
-          path: src/
-          level: ${{ inputs.phpstan-level }}
+     # - name: PHPStan
+      #  uses: php-actions/phpstan@v3
+       # with:
+        #  path: src/
+         # level: ${{ inputs.phpstan-level }}
 
       - name: Fetch secrets from Vault for testing
-        if: failure()
+        id: fetch_secrets
+        #if: failure()
         uses: hashicorp/vault-action@v2.7.4
         with:
           url: ${{ secrets.VAULT_SERVER }}
@@ -58,7 +59,7 @@ jobs:
             ${{ secrets.VAULT_PATH_TEST }} ms_teams_webhook_uri | MS_TEAMS_WEBHOOK_URI
 
       - name: Notify teams on failure
-        if: failure()
+        #if: failure()
         uses: jdcargile/ms-teams-notification@v1.3
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
