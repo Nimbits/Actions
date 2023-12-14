@@ -30,14 +30,13 @@ jobs:
   fetch_secrets:
     name: Generate output
     runs-on: ubuntu-latest
-    # Map the job outputs to step outputs
     outputs:
-      remote_host: ${{ steps.set_outputs.outputs.remote_host }}
-      remote_user: ${{ steps.set_outputs.outputs.remote_user }}
-      remote_pwd: ${{ steps.set_outputs.outputs.remote_pwd }}
-      ms_teams_webhook_uri: ${{ steps.set_outputs.outputs.ms_teams_webhook_uri }}
-      live_path: ${{ steps.set_outputs.outputs.live_path }}
-      dev_path: ${{ steps.set_outputs.outputs.dev_path }}
+      remote_host: ${{ steps.fetch-secrets.outputs.REMOTE_HOST }}
+      remote_user: ${{ steps.fetch-secrets.outputs.REMOTE_USER }}
+      remote_pwd: ${{ steps.fetch-secrets.outputs.REMOTE_PWD }}
+      ms_teams_webhook_uri: ${{ steps.fetch-secrets.outputs.MS_TEAMS_WEBHOOK_URI }}
+      live_path: ${{ steps.fetch-secrets.outputs.LIVE_PATH }}
+      dev_path: ${{ steps.fetch-secrets.outputs.DEV_PATH }}
     steps:
       - name: Fetch secrets from Vault
         id: fetch-secrets
@@ -53,11 +52,3 @@ jobs:
             ${{ inputs.secret_path }} ms_teams_webhook_uri | MS_TEAMS_WEBHOOK_URI ;
             ${{ inputs.secret_path }} live_path | LIVE_PATH ;
             ${{ inputs.secret_path }} dev_path | DEV_PATH ;
-
-      - id: set_outputs
-        run: echo "remote_host=bob.nimbits-hosting.de" >> $GITHUB_OUTPUT
-             echo "remote_user=${{ env.REMOTE_USER }}" >> $GITHUB_OUTPUT
-             echo "remote_pwd=${{ env.REMOTE_PWD }}" >> $GITHUB_OUTPUT
-             echo "ms_teams_webhook_uri=${{ env.MS_TEAMS_WEBHOOK_URI }}" >> $GITHUB_OUTPUT
-             echo "live_path=${{ env.LIVE_PATH }}" >> $GITHUB_OUTPUT
-             echo "dev_path=${{ env.DEV_PATH }}" >> $GITHUB_OUTPUT
