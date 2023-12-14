@@ -26,6 +26,8 @@ on:
     secrets:
       CURR_VAULT_PATH:
         required: true
+      VAULT_TOKEN:
+        required: true
     outputs:
       test-passed:
         description: 'Indicates if tests passed'
