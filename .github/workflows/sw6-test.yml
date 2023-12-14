@@ -26,7 +26,7 @@ on:
     secrets:
       CURR_VAULT_PATH:
         required: true
-      VAULT_TOKEN:
+      CURR_VAULT_TOKEN:
         required: true
     outputs:
       test-passed:
@@ -56,7 +56,7 @@ jobs:
         with:
           url: ${{ vars.VAULT_SERVER }}
           method: token
-          token: ${{ secrets.VAULT_TOKEN }}
+          token: ${{ secrets.CURR_VAULT_TOKEN }}
           secrets: |
             ${{ secrets.CURR_VAULT_PATH }} ms_teams_webhook_uri | MS_TEAMS_WEBHOOK_URI
 
