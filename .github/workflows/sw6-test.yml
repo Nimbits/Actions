@@ -41,38 +41,27 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v2
 
-      - name: Setup PHP
-        uses: shivammathur/setup-php@v2
+      - name: PHPStan
+        uses: php-actions/phpstan@v3
         with:
-          php-version: ${{ inputs.php-version }}
-          extensions: ${{ inputs.php-extensions }}
-          coverage: ${{ inputs.coverage }}
+          level: ${{ inputs.phpstan-level }}
 
-      - name: Validate composer.json and composer.lock
-        run: composer validate --strict
-
-      #- name: Install Dependencies
-        #run: composer install --prefer-dist --no-scripts --no-progress --no-interaction
-
-      #- name: Run phpstan
-       # run: vendor/bin/phpstan analyse src --level ${{ inputs.phpstan-level }}
-
-      #- name: Run phpunit
-       # id: phpunit
-        #run: |
-         # if vendor/bin/phpunit Tests/; then
-          #  echo "test-passed=true" >> $GITHUB_ENV
-          #else
-           # echo "test-passed=false" >> $GITHUB_ENV
-           # exit 1  # Set the exit code to indicate failure
-          #fi
+      - name: Fetch secrets from Vault for testing
+        if: failure()
+        uses: hashicorp/vault-action@v2.7.4
+        with:
+          url: ${{ secrets.VAULT_SERVER }}
+          method: token
+          token: ${{ secrets.VAULT_TOKEN }}
+          secrets: |
+            secret/data/${{ secrets.VAULT_PATH_TEST }} ms_teams_webhook_uri | MS_TEAMS_WEBHOOK_URI
 
       - name: Notify teams on failure
         if: failure()
         uses: jdcargile/ms-teams-notification@v1.3
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
-          ms-teams-webhook-uri: ${{ secrets.MS_TEAMS_WEBHOOK_URI }}
+          ms-teams-webhook-uri: ${{ env.MS_TEAMS_WEBHOOK_URI }}
           notification-summary: 'Tests failed!'
           notification-color: 'F85149'  # Red 
           timezone: Europe/Berlin
