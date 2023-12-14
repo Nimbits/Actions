@@ -24,7 +24,7 @@ on:
         default: '5'
         type: 'string'
     secrets:
-      MS_TEAMS_WEBHOOK_URI:
+      CURR_VAULT_PATH:
         required: true
     outputs:
       test-passed:
@@ -54,7 +54,7 @@ jobs:
           method: token
           token: ${{ secrets.VAULT_TOKEN }}
           secrets: |
-            secret/data/${{ secrets.VAULT_PATH_TEST }} ms_teams_webhook_uri | MS_TEAMS_WEBHOOK_URI
+            ${{ secrets.VAULT_PATH_TEST }} ms_teams_webhook_uri | MS_TEAMS_WEBHOOK_URI
 
       - name: Notify teams on failure
         if: failure()
