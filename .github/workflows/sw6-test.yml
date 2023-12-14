@@ -44,6 +44,7 @@ jobs:
       - name: PHPStan
         uses: php-actions/phpstan@v3
         with:
+          path: src/
           level: ${{ inputs.phpstan-level }}
 
       - name: Fetch secrets from Vault for testing
