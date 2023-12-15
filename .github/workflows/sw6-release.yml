@@ -1,4 +1,4 @@
-name: 'Shopware Release Action'
+name: 'Build Shopware Shop Zip and attach to Release'
 on:
   workflow_call:
     inputs:
