@@ -81,7 +81,8 @@ jobs:
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
-            const assets = ${{ steps.get_latest_release.outputs.result }}.assets;
+            const releaseData = ${{ fromJson(steps.get_latest_release.outputs.result) }};
+            const assets = releaseData.assets;
             const assetName = '${{ inputs.repo_name }}.zip';
             if (assets.some(asset => asset.name === assetName)) {
               throw new Error('Asset already exists in the latest release.');
