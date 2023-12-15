@@ -3,61 +3,28 @@ name: Deploy to Shopware 6
 on:
   workflow_call:
     inputs:
-      remote_host:
-        required: true
-        type: string
-      remote_user:
-        required: true
-        type: string
-      target_path:
-        required: true
-        type: string
+      is_prod:
+        required: false
+        type: boolean
+        default: false
       check_tag:
         required: false
         type: boolean
         default: true
     secrets:
-      REMOTE_PWD:
+      CURR_VAULT_PATH:
         required: true
-      MS_TEAMS_WEBHOOK_URI:
+      CURR_VAULT_TOKEN:
         required: true
 
 jobs:
   build:
     runs-on: ubuntu-latest
-    outputs:
-      should_deploy: ${{ steps.check.outputs.should_deploy }}
     steps:
     - name: Checkout code
       uses: actions/checkout@v2
       with:
-        fetch-depth: 0  # fetch the entire history to make sure we can check tags
-
-    - name: Check tag
-      if: inputs.check_tag == true
-      id: check
-      run: |
-        tag=$(git tag --contains ${{ github.sha }})
-        should_deploy="false"
-        if [[ -z "$tag" ]]; then
-          echo "No new tag associated with this commit. Skipping deployment."
-        elif [[ "$tag" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-          should_deploy="true"
-        else
-          echo "Tag does not match the format '[0-9]+.[0-9]+.[0-9]+'! Consider removing the tag."
-          exit 1
-        fi
-        echo "should_deploy=$should_deploy" >> $GITHUB_ENV
-        echo "should_deploy=$should_deploy" >> $GITHUB_PATH
-        echo "Deployment status: $should_deploy"   # Add this for debugging
-
-    - name: Skip tag
-      if: inputs.check_tag == false
-      id: skip_tag
-      run: |
-        should_deploy="true"
-        echo "should_deploy=$should_deploy" >> $GITHUB_ENV
-        echo "should_deploy=$should_deploy" >> $GITHUB_PATH
+        fetch-depth: 0
 
     - name: Get latest tag
       id: latest_tag
@@ -66,64 +33,78 @@ jobs:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
     - name: Install jq
+      run: sudo apt-get update && sudo apt-get install -y jq
+
+    - name: Validate tag format
+      if: check_tag
       run: |
-        sudo apt-get update
-        sudo apt-get install -y jq
-        echo "Deployment status: ${{ env.should_deploy }}"
+        if ! [[ "${{ steps.latest_tag.outputs.tag }}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+          echo "Tag does not match the format '[0-9]+.[0-9]+.[0-9]+'! Consider removing the tag."
+          exit 1
+        fi
 
     - name: Update version in composer.json
-      if: env.should_deploy == 'true'
       run: jq '.version = "${{ steps.latest_tag.outputs.tag }}"' composer.json > composer.tmp.json && mv composer.tmp.json composer.json
 
     - name: Remove unnecessary files
-      if: env.should_deploy == 'true'
       run: |
         rm -rf README.md .git* .eslint* .env* .prettier*
 
+    - name: Fetch secrets from Vault for deployment
+      id: fetch_secrets
+      uses: hashicorp/vault-action@v2.7.4
+      with:
+        url: ${{ vars.VAULT_SERVER }}
+        method: token
+        token: ${{ secrets.CURR_VAULT_TOKEN }}
+        secrets: |
+          ${{ secrets.CURR_VAULT_PATH }} remote_host | REMOTE_HOST ;
+          ${{ secrets.CURR_VAULT_PATH }} remote_user | REMOTE_USER ;
+          ${{ secrets.CURR_VAULT_PATH }} remote_pwd | REMOTE_PWD ;
+          ${{ secrets.CURR_VAULT_PATH }} ${{ inputs.is_prod && 'prod_path' || 'dev_path' }} | REMOTE_PATH ;
+          ${{ secrets.CURR_VAULT_PATH }} ms_teams_webhook_uri | MS_TEAMS_WEBHOOK_URI
+
     - name: Deployment to temporary directory
-      if: env.should_deploy == 'true'
       uses: appleboy/scp-action@v0.1.4
       with:
-          host: ${{ inputs.remote_host }}
+          host: ${{ env.REMOTE_HOST }}
           port: 22
-          username: ${{ inputs.remote_user }}
-          password: ${{ secrets.REMOTE_PWD }}
-          target: ${{ inputs.target_path }}/ci_temp/${{ github.event.repository.name }}
+          username: ${{ env.REMOTE_USER }}
+          password: ${{ env.REMOTE_PWD }}
+          target: ${{ env.REMOTE_PATH }}/ci_temp/${{ github.event.repository.name }}
           source: ./*
           strip_components: 0
 
     - name: Replace old directory with new one
-      if: env.should_deploy == 'true'
       uses: appleboy/ssh-action@v1.0.0
       with:
-        host: ${{ inputs.remote_host }}
+        host: ${{ env.REMOTE_HOST }}
         port: 22
-        username: ${{ inputs.remote_user }}
-        password: ${{ secrets.REMOTE_PWD }}
+        username: ${{ env.REMOTE_USER }}
+        password: ${{ env.REMOTE_PWD }}
         script: |
-          rm -rf ${{ inputs.target_path }}/custom/plugins/${{ github.event.repository.name }}
-          mv ${{ inputs.target_path }}/ci_temp/${{ github.event.repository.name }} ${{ inputs.target_path }}/custom/plugins/${{ github.event.repository.name }}
+          rm -rf ${{ env.REMOTE_PATH }}/custom/plugins/${{ github.event.repository.name }}
+          mv ${{ env.REMOTE_PATH }}/ci_temp/${{ github.event.repository.name }} ${{ env.REMOTE_PATH }}/custom/plugins/${{ github.event.repository.name }}
     
     - name: Clear Cache & Theme compile & Assets install
-      if: env.should_deploy == 'true'
       uses: appleboy/ssh-action@v1.0.0
       with:
-        host: ${{ inputs.remote_host }}
+        host: ${{ env.REMOTE_HOST }}
         port: 22
-        username: ${{ inputs.remote_user }}
-        password: ${{ secrets.REMOTE_PWD }}
+        username: ${{ env.REMOTE_USER }}
+        password: ${{ env.REMOTE_PWD }}
         script: |
-          cd ${{ inputs.target_path }}
+          cd ${{ env.REMOTE_PATH }}
           bin/console cache:clear
           bin/console theme:compile
           bin/console assets:install
 
     - name: Notify teams on success
-      if: success() && env.should_deploy == 'true' && inputs.check_tag == true
+      if: success()
       uses: jdcargile/ms-teams-notification@v1.3
       with:
         github-token: ${{ secrets.GITHUB_TOKEN }}
-        ms-teams-webhook-uri: ${{ secrets.MS_TEAMS_WEBHOOK_URI }}
+        ms-teams-webhook-uri: ${{ env.MS_TEAMS_WEBHOOK_URI }}
         notification-summary: 'Deployment successful!'
         notification-color: '3FBA50' # Green
         timezone: Europe/Berlin
@@ -134,7 +115,7 @@ jobs:
       uses: jdcargile/ms-teams-notification@v1.3
       with:
         github-token: ${{ secrets.GITHUB_TOKEN }}
-        ms-teams-webhook-uri: ${{ secrets.MS_TEAMS_WEBHOOK_URI }}
+        ms-teams-webhook-uri: ${{ env.MS_TEAMS_WEBHOOK_URI }}
         notification-summary: 'Deployment failed!'
         notification-color: 'F85149'  # Red 
         timezone: Europe/Berlin
