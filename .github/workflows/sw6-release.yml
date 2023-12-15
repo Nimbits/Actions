@@ -75,6 +75,14 @@ jobs:
             });
             core.setOutput('upload_url', response.data.upload_url);
 
+      - name: Debug - Print Latest Release Data
+        id: debug_print
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            console.log("Latest Release Data:", ${{ steps.get_latest_release.outputs.result }});
+      
       - name: Check if Asset Already Exists
         id: check_asset
         uses: actions/github-script@v7
@@ -87,6 +95,7 @@ jobs:
             if (assets.some(asset => asset.name === assetName)) {
               throw new Error('Asset already exists in the latest release.');
             }
+
 
       - name: Upload Release Asset
         if: steps.check_asset.outcome == 'success'
