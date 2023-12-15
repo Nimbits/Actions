@@ -98,7 +98,7 @@ jobs:
         username: ${{ env.REMOTE_USER }}
         password: ${{ env.REMOTE_PWD }}
         script: |
-          
+          cd ${{ env.REMOTE_PATH }}
           bin/console cache:clear
           bin/console theme:compile
           bin/console assets:install
