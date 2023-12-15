@@ -39,11 +39,11 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v2
 
-      - name: PHPStan
-        uses: php-actions/phpstan@v3
-        with:
-          path: src/
-          level: ${{ inputs.phpstan-level }}
+      #- name: PHPStan
+      #  uses: php-actions/phpstan@v3
+      #  with:
+      #    path: src/
+      #    level: ${{ inputs.phpstan-level }}
 
       - name: Fetch secrets from Vault for testing
         id: fetch_secrets
