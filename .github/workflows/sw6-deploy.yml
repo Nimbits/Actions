@@ -11,6 +11,10 @@ on:
         required: false
         type: boolean
         default: true
+      repo_name:
+        required: false
+        type: 'string'
+        default: ${{ github.event.repository.name }}
     secrets:
       CURR_VAULT_PATH:
         required: true
@@ -36,7 +40,7 @@ jobs:
       run: sudo apt-get update && sudo apt-get install -y jq
 
     - name: Validate tag format
-      if: check_tag
+      if: inputs.check_tag
       run: |
         if ! [[ "${{ steps.latest_tag.outputs.tag }}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
           echo "Tag does not match the format '[0-9]+.[0-9]+.[0-9]+'! Consider removing the tag."
@@ -71,7 +75,7 @@ jobs:
           port: 22
           username: ${{ env.REMOTE_USER }}
           password: ${{ env.REMOTE_PWD }}
-          target: ${{ env.REMOTE_PATH }}/ci_temp/${{ github.event.repository.name }}
+          target: ${{ env.REMOTE_PATH }}/ci_temp/${{ inputs.repo_name }}
           source: ./*
           strip_components: 0
 
@@ -83,8 +87,8 @@ jobs:
         username: ${{ env.REMOTE_USER }}
         password: ${{ env.REMOTE_PWD }}
         script: |
-          rm -rf ${{ env.REMOTE_PATH }}/custom/plugins/${{ github.event.repository.name }}
-          mv ${{ env.REMOTE_PATH }}/ci_temp/${{ github.event.repository.name }} ${{ env.REMOTE_PATH }}/custom/plugins/${{ github.event.repository.name }}
+          rm -rf ${{ env.REMOTE_PATH }}/custom/plugins/${{ inputs.repo_name }}
+          mv ${{ env.REMOTE_PATH }}/ci_temp/${{ inputs.repo_name }} ${{ env.REMOTE_PATH }}/custom/plugins/${{ inputs.repo_name }}
     
     - name: Clear Cache & Theme compile & Assets install
       uses: appleboy/ssh-action@v1.0.0
