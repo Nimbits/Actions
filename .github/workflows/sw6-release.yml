@@ -73,7 +73,7 @@ jobs:
               owner: context.repo.owner,
               repo: context.repo.repo
             });
-            return response.data;
+            core.setOutput('upload_url', response.data.upload_url);
 
       - name: Check if Asset Already Exists
         id: check_asset
@@ -91,7 +91,7 @@ jobs:
         if: steps.check_asset.outcome == 'success'
         uses: actions/upload-release-asset@v1
         with:
-          upload_url: ${{ steps.get_latest_release.outputs.result.upload_url }}
+          upload_url: ${{ steps.get_latest_release.outputs.upload_url }}
           asset_path: ./${{ inputs.repo_name }}.zip
           asset_name: ${{ inputs.repo_name }}.zip
           asset_content_type: application/zip
