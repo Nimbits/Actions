@@ -3,21 +3,6 @@ name: 'Shopware 6 Plugin Test'
 on:
   workflow_call:
     inputs:
-      php-version:
-        description: 'PHP version'
-        required: false
-        default: '8.2'
-        type: 'string'
-      php-extensions:
-        description: 'PHP extensions to install'
-        required: false
-        default: 'mbstring, dom, curl, libxml, xml, bcmath, json, zip, iconv, intl, pdo, pdo_mysql'
-        type: 'string'
-      coverage:
-        description: 'Code coverage tool'
-        required: false
-        default: 'none'
-        type: 'string'
       phpstan-level:
         description: 'PHPStan analysis level'
         required: false
@@ -32,9 +17,7 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
-    outputs:
-      test-passed: ${{ steps.phpunit.outputs.test-passed }}
-
+    
     steps:
       - name: Checkout code
         uses: actions/checkout@v2
