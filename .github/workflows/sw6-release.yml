@@ -2,10 +2,10 @@ name: 'Build Shopware Shop Zip and attach to Release'
 on:
   workflow_call:
     inputs:
-      repository-name:
-        description: 'Repository name'
-        required: true
-        type: string
+      repo_name:
+        required: false
+        type: 'string'
+        default: ${{ github.event.repository.name }}
     secrets:
       github-token:
         required: true
@@ -82,7 +82,7 @@ jobs:
           github-token: ${{ secrets.github-token }}
           script: |
             const assets = ${{ steps.get_latest_release.outputs.result }}.assets;
-            const assetName = '${{ inputs.repository-name }}.zip';
+            const assetName = '${{ inputs.repo_name }}.zip';
             if (assets.some(asset => asset.name === assetName)) {
               throw new Error('Asset already exists in the latest release.');
             }
@@ -92,8 +92,8 @@ jobs:
         uses: actions/upload-release-asset@v1
         with:
           upload_url: ${{ steps.get_latest_release.outputs.result.upload_url }}
-          asset_path: ./${{ inputs.repository-name }}.zip
-          asset_name: ${{ inputs.repository-name }}.zip
+          asset_path: ./${{ inputs.repo_name }}.zip
+          asset_name: ${{ inputs.repo_name }}.zip
           asset_content_type: application/zip
 
       - name: Notify teams on failure
