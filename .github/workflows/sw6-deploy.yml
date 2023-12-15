@@ -104,12 +104,12 @@ jobs:
           bin/console assets:install
 
     - name: Notify teams on success
-      if: success()
+      if: success() && inputs.is_prod
       uses: jdcargile/ms-teams-notification@v1.3
       with:
         github-token: ${{ secrets.GITHUB_TOKEN }}
         ms-teams-webhook-uri: ${{ env.MS_TEAMS_WEBHOOK_URI }}
-        notification-summary: 'Deployment successful!'
+        notification-summary: '[PROD] Deployment successful!'
         notification-color: '3FBA50' # Green
         timezone: Europe/Berlin
 
@@ -120,7 +120,7 @@ jobs:
       with:
         github-token: ${{ secrets.GITHUB_TOKEN }}
         ms-teams-webhook-uri: ${{ env.MS_TEAMS_WEBHOOK_URI }}
-        notification-summary: 'Deployment failed!'
-        notification-color: 'F85149'  # Red 
+        notification-summary: ${{ inputs.is_prod && '[PROD] Deployment failed!' || 'Deployment to Dev-Environment failed.' }}
+        notification-color: ${{ inputs.is_prod && 'F85149' || 'F88F49' }}  # Red / Orange
         timezone: Europe/Berlin
 
