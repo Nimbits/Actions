@@ -7,9 +7,9 @@ on:
         type: 'string'
         default: ${{ github.event.repository.name }}
     secrets:
-      github-token:
+      CURR_VAULT_PATH:
         required: true
-      MS_TEAMS_WEBHOOK_URI:
+      CURR_VAULT_TOKEN:
         required: true
 
 jobs:
@@ -25,7 +25,7 @@ jobs:
         id: latest_tag
         uses: actions-ecosystem/action-get-latest-tag@v1
         env:
-          GITHUB_TOKEN: ${{ inputs.github-token }}
+          GITHUB_TOKEN: ${{ inputs.GITHUB_TOKEN }}
   
       - name: Install jq
         run: |
@@ -67,7 +67,7 @@ jobs:
         id: get_latest_release
         uses: actions/github-script@v7
         with:
-          github-token: ${{ secrets.github-token }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
             const response = await github.rest.repos.getLatestRelease({
               owner: context.repo.owner,
@@ -79,7 +79,7 @@ jobs:
         id: check_asset
         uses: actions/github-script@v7
         with:
-          github-token: ${{ secrets.github-token }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
             const assets = ${{ steps.get_latest_release.outputs.result }}.assets;
             const assetName = '${{ inputs.repo_name }}.zip';
@@ -96,12 +96,23 @@ jobs:
           asset_name: ${{ inputs.repo_name }}.zip
           asset_content_type: application/zip
 
+      - name: Fetch secrets from Vault for testing
+        id: fetch_secrets
+        if: failure()
+        uses: hashicorp/vault-action@v2.7.4
+        with:
+          url: ${{ vars.VAULT_SERVER }}
+          method: token
+          token: ${{ secrets.CURR_VAULT_TOKEN }}
+          secrets: |
+            ${{ secrets.CURR_VAULT_PATH }} ms_teams_webhook_uri | MS_TEAMS_WEBHOOK_URI
+
       - name: Notify teams on failure
         if: failure()
         uses: jdcargile/ms-teams-notification@v1.3
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
-          ms-teams-webhook-uri: ${{ secrets.MS_TEAMS_WEBHOOK_URI }}
+          ms-teams-webhook-uri: ${{ env.MS_TEAMS_WEBHOOK_URI }}
           notification-summary: 'Release failed!'
           notification-color: 'F85149'  # Red 
           timezone: Europe/Berlin
