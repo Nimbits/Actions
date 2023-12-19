@@ -26,6 +26,12 @@ jobs:
         uses: actions-ecosystem/action-get-latest-tag@v1
         env:
           GITHUB_TOKEN: ${{ inputs.GITHUB_TOKEN }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '20'  
+          npm-version: '10'  
   
       - name: Install jq
         run: |
@@ -46,7 +52,7 @@ jobs:
   
       - name: Build & create zip # todo: Improve this step
         run: |
-          ./shopware-cli extension zip --git-commit $(git rev-parse HEAD) .
+          ./shopware-cli extension zip --release .
           mkdir ${{ github.event.repository.name }}
           mkdir temp
           [ -f shopware-cli_Linux_x86_64.tar.gz ] && mv shopware-cli_Linux_x86_64.tar.gz temp/
