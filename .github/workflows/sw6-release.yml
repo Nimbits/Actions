@@ -17,18 +17,18 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4.1.1
         with:
           fetch-depth: 0  # fetch the entire history to make sure we can check tags
   
       - name: Get latest tag
         id: latest_tag
-        uses: actions-ecosystem/action-get-latest-tag@v1
+        uses: actions-ecosystem/action-get-latest-tag@v1.6.0
         env:
           GITHUB_TOKEN: ${{ inputs.GITHUB_TOKEN }}
 
       - name: Setup Node.js
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4.0.1
         with:
           node-version: '20'  
           npm-version: '10'  
@@ -70,21 +70,13 @@ jobs:
           zip -r ${{ github.event.repository.name }}.zip ${{ github.event.repository.name }}  
 
       - name: Upload binaries to release
-        uses: svenstaro/upload-release-action@v2
+        uses: svenstaro/upload-release-action@2.7.0
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
           file: ./${{ inputs.repo_name }}.zip
           asset_name: ${{ inputs.repo_name }}.zip
           tag: ${{ steps.latest_tag.outputs.tag }}
           overwrite: false
-
-    #  - name: Upload Release Asset
-     #   uses: actions/upload-release-asset@v1
-     #   with:
-     #     upload_url: ${{ steps.get_latest_release.outputs.upload_url }}
-     #     asset_path: ./${{ inputs.repo_name }}.zip
-     #     asset_name: ${{ inputs.repo_name }}.zip
-     #     asset_content_type: application/zip
 
       - name: Fetch secrets from Vault for testing
         id: fetch_secrets
