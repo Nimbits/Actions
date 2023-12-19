@@ -27,6 +27,9 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4.1.1
 
+      - name: Install dependencies
+        run: composer install
+
       - name: PHPStan
         uses: php-actions/phpstan@v3
         with:
