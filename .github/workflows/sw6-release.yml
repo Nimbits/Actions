@@ -17,7 +17,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
         with:
           fetch-depth: 0  # fetch the entire history to make sure we can check tags
   
@@ -62,49 +62,25 @@ jobs:
           [ -f phpunit.xml ] && mv phpunit.xml temp/
           find . -maxdepth 1 ! -name ${{ github.event.repository.name }} ! -name temp -exec mv {} ${{ github.event.repository.name }} \;
           zip -r ${{ github.event.repository.name }}.zip ${{ github.event.repository.name }}  
-  
-      - name: Get Latest Release
-        id: get_latest_release
-        uses: actions/github-script@v7
-        with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          script: |
-            const response = await github.rest.repos.getLatestRelease({
-              owner: context.repo.owner,
-              repo: context.repo.repo
-            });
-            core.setOutput('upload_url', response.data.upload_url);
 
-      - name: Debug - Print Latest Release Data
-        id: debug_print
-        uses: actions/github-script@v7
-        with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          script: |
-            console.log("Latest Release Data:", ${{ steps.get_latest_release.outputs.result }});
-      
-      - name: Check if Asset Already Exists
-        id: check_asset
-        uses: actions/github-script@v7
-        with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          script: |
-            const releaseData = ${{ fromJson(steps.get_latest_release.outputs.result) }};
-            const assets = releaseData.assets;
-            const assetName = '${{ inputs.repo_name }}.zip';
-            if (assets.some(asset => asset.name === assetName)) {
-              throw new Error('Asset already exists in the latest release.');
-            }
-
-
-      - name: Upload Release Asset
+      - name: Upload binaries to release
         if: steps.check_asset.outcome == 'success'
-        uses: actions/upload-release-asset@v1
+        uses: svenstaro/upload-release-action@v2
         with:
-          upload_url: ${{ steps.get_latest_release.outputs.upload_url }}
-          asset_path: ./${{ inputs.repo_name }}.zip
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          file: ${{ steps.get_latest_release.outputs.upload_url }}
           asset_name: ${{ inputs.repo_name }}.zip
-          asset_content_type: application/zip
+          tag: ${{ github.ref }}
+          overwrite: false
+
+    #  - name: Upload Release Asset
+     #  if: steps.check_asset.outcome == 'success'
+     #   uses: actions/upload-release-asset@v1
+     #   with:
+     #     upload_url: ${{ steps.get_latest_release.outputs.upload_url }}
+     #     asset_path: ./${{ inputs.repo_name }}.zip
+     #     asset_name: ${{ inputs.repo_name }}.zip
+     #     asset_content_type: application/zip
 
       - name: Fetch secrets from Vault for testing
         id: fetch_secrets
