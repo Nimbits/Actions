@@ -75,7 +75,7 @@ jobs:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
           file: ./${{ inputs.repo_name }}.zip
           asset_name: ${{ inputs.repo_name }}.zip
-          tag: ${{ steps.get-latest-tag.outputs.tag }}
+          tag: ${{ steps.latest_tag.outputs.tag }}
           overwrite: false
 
     #  - name: Upload Release Asset
