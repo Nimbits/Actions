@@ -69,7 +69,7 @@ jobs:
           ${{ secrets.CURR_VAULT_PATH }} ms_teams_webhook_uri | MS_TEAMS_WEBHOOK_URI
 
     - name: Create Deployment with Latest Release
-      id: create_deployment # Hinzufügen einer ID
+      id: create_deployment
       uses: actions/github-script@v5
       with:
         github-token: ${{ secrets.GITHUB_TOKEN }}
