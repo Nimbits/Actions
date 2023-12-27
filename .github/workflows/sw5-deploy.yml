@@ -65,6 +65,19 @@ jobs:
           ${{ secrets.CURR_VAULT_PATH }} ${{ inputs.is_prod && 'prod_path' || 'dev_path' }} | REMOTE_PATH ;
           ${{ secrets.CURR_VAULT_PATH }} ms_teams_webhook_uri | MS_TEAMS_WEBHOOK_URI
 
+    - name: Create Deployment
+      if: success()
+      id: deployment
+      uses: bobheadxi/deployments@v1.4.0
+      with:
+        step: start
+        token: ${{ secrets.GITHUB_TOKEN }}
+        env: ${{ inputs.is_prod && 'Production' || 'Development' }}
+        ref: ${{ github.ref }}
+        no_override: true
+        #env_url: todo: URL
+        auto_inactive: true
+
     - name: Deployment to temporary directory
       uses: appleboy/scp-action@v0.1.4
       with:
@@ -104,6 +117,16 @@ jobs:
           cd ${{ env.REMOTE_PATH }}
           bin/console sw:cache:clear
           bin/console sw:theme:cache:generate
+
+    - name: Update deployment status
+      uses: bobheadxi/deployments@v1.4.0
+      if: always()
+      with:
+        step: finish
+        token: ${{ secrets.GITHUB_TOKEN }}
+        status: ${{ job.status }}
+        env: ${{ steps.deployment.outputs.env }}
+        deployment_id: ${{ steps.deployment.outputs.deployment_id }}
 
     - name: Notify teams on success
       if: success() && inputs.is_prod
