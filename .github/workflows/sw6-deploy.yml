@@ -68,6 +68,32 @@ jobs:
           ${{ secrets.CURR_VAULT_PATH }} ${{ inputs.is_prod && 'prod_path' || 'dev_path' }} | REMOTE_PATH ;
           ${{ secrets.CURR_VAULT_PATH }} ms_teams_webhook_uri | MS_TEAMS_WEBHOOK_URI
 
+    - name: Create Deployment with Latest Release
+      id: create_deployment # Hinzufügen einer ID
+      uses: actions/github-script@v5
+      with:
+        github-token: ${{ secrets.GITHUB_TOKEN }}
+        script: |
+          const environment = inputs.is_prod ? 'Production' : 'Development';
+    
+          // Get latest release
+          const releaseResponse = await github.rest.repos.getLatestRelease({
+            owner: context.repo.owner,
+            repo: context.repo.repo
+          });
+          const latestRelease = releaseResponse.data.tag_name;
+    
+          // Create deployment
+          const deploymentResponse = await github.rest.repos.createDeployment({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            ref: context.ref,
+            required_contexts: [],
+            environment: environment,
+            description: `Deploying to ${environment} with release ${latestRelease}`
+          });
+          return deploymentResponse.data.id; # return deployment id for future steops
+
     - name: Deployment to temporary directory
       uses: appleboy/scp-action@v0.1.4
       with:
@@ -112,6 +138,19 @@ jobs:
         notification-summary: '[PROD] Deployment successful!'
         notification-color: '3FBA50' # Green
         timezone: Europe/Berlin
+
+    - name: Mark Deployment as Failure
+      if: failure() 
+      uses: actions/github-script@v5
+      with:
+        github-token: ${{ secrets.GITHUB_TOKEN }}
+        script: |
+          await github.rest.repos.createDeploymentStatus({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            deployment_id: ${{ steps.create_deployment.outputs.result }}, # use deployment id
+            state: 'failure'
+          });
 
 
     - name: Notify teams on failure
