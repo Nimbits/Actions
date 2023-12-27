@@ -70,6 +70,7 @@ jobs:
 
     - name: Create Deployment
       if: success()
+      id: deployment
       uses: bobheadxi/deployments@v1.4.0
       with:
         step: start
@@ -77,6 +78,8 @@ jobs:
         env: ${{ inputs.is_prod && 'Production' || 'Development' }}
         ref: ${{ github.ref }}
         no_override: true
+        #env_url: todo: URL
+        auto_inactive: true
 
     - name: Deployment to temporary directory
       uses: appleboy/scp-action@v0.1.4
@@ -123,15 +126,15 @@ jobs:
         notification-color: '3FBA50' # Green
         timezone: Europe/Berlin
 
-    - name: Mark Deployment as Failure
-      if: failure()
-      uses: bobheadxi/deployments@v0.4.3
+    - name: update deployment status
+      uses: bobheadxi/deployments@v1.4.0
+      if: always()
       with:
         step: finish
         token: ${{ secrets.GITHUB_TOKEN }}
-        status: failure
-        env: ${{ inputs.is_prod && 'Production' || 'Development' }}
-        ref: ${{ github.ref }}
+        status: ${{ job.status }}
+        env: ${{ steps.deployment.outputs.env }}
+        deployment_id: ${{ steps.deployment.outputs.deployment_id }}
 
 
     - name: Notify teams on failure
