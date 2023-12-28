@@ -33,20 +33,6 @@ jobs:
       with:
         fetch-depth: 0
 
-    - name: Get latest tag
-      id: latest_tag
-      uses: actions-ecosystem/action-get-latest-tag@v1.6.0
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-    - name: Validate tag format
-      if: inputs.check_tag
-      run: |
-        if ! [[ "${{ steps.latest_tag.outputs.tag }}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-          echo "Tag does not match the format '[0-9]+.[0-9]+.[0-9]+'! Consider removing the tag."
-          exit 1
-        fi
-
     - name: Remove unnecessary files
       run: |
         rm -rf README.md .git* .eslint* .env* .prettier*
