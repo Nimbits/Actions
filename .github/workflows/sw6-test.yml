@@ -27,10 +27,12 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4.1.1
 
+      - name: Configure GitHub token #needed for vcs dependencies
+        run: composer config --global --auth github-oauth.github.com ${{ secrets.GITHUB_TOKEN }}
+
       - name: Install dependencies
         run: |
           [ -f composer.lock ] && rm composer.lock
-          composer update
           composer install
 
       - name: PHPStan
