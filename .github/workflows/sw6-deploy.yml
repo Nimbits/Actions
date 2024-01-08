@@ -48,6 +48,7 @@ jobs:
         fi
 
     - name: Update version in composer.json
+      if: is_prod
       run: jq '.version = "${{ steps.latest_tag.outputs.tag }}"' composer.json > composer.tmp.json && mv composer.tmp.json composer.json
 
     - name: Remove unnecessary files
