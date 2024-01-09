@@ -53,7 +53,7 @@ jobs:
 
     - name: Remove unnecessary files
       run: |
-        rm -rf README.md .git* .eslint* .env* .prettier*
+        rm -rf README.md .git* .eslint* .env* .prettier* .husky commitlint.config.js
 
     - name: Fetch secrets from Vault for deployment
       id: fetch_secrets
