@@ -55,11 +55,12 @@ jobs:
       - name: Check for README changes
         if: github.event_name != 'release'
         run: |
-          git fetch origin ${{ steps.basebranch.outputs.branch }}
-          if ! git diff --name-only HEAD origin/${{ steps.basebranch.outputs.branch }} | grep -q "README"; then
+          git fetch origin ${{ env.branch }}
+          if ! git diff --name-only HEAD origin/${{ env.branch }} | grep -q "README"; then
             echo "Please add the version to the readme"
             exit 1
           fi
+
 
       - name: Configure GitHub token #needed for vcs dependencies
         run: composer config --global --auth github-oauth.github.com ${{ secrets.DEPENDENCY_TOKEN }}
