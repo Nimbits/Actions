@@ -33,7 +33,6 @@ jobs:
         id: basebranch
         run: |
           if [[ "${{ github.event_name }}" == "release" ]]; then
-            # Assume the base branch for releases is 'main' or 'master'
             echo "branch=$(git ls-remote --heads origin master | grep -q master && echo master || echo main)" >> $GITHUB_ENV
           else
             echo "branch=$(git ls-remote --heads origin master | grep -q master && echo master || (git ls-remote --heads origin main | grep -q main && echo main))" >> $GITHUB_ENV
