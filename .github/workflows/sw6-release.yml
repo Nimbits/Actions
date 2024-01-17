@@ -52,6 +52,7 @@ jobs:
   
       - name: Build & create zip # todo: Improve this step
         run: |
+          rm -f package-lock.json 
           ./shopware-cli extension zip --release .
           mkdir ${{ github.event.repository.name }}
           mkdir temp
@@ -66,6 +67,8 @@ jobs:
           [ -f README.md  ] && mv README.md temp/
           [ -f .gitignore ] && mv .gitignore temp/
           [ -f phpunit.xml ] && mv phpunit.xml temp/
+          [ -d .husky ] && mv .husky temp/
+          [ -d .node_modules ] && mv .node_modules temp/
           find . -maxdepth 1 ! -name ${{ github.event.repository.name }} ! -name temp -exec mv {} ${{ github.event.repository.name }} \;
           zip -r ${{ github.event.repository.name }}.zip ${{ github.event.repository.name }}  
 
