@@ -86,7 +86,7 @@ jobs:
           method: token
           token: ${{ secrets.CURR_VAULT_TOKEN }}
           secrets: |
-            ${{ secrets.CURR_VAULT_PATH }} ms_teams_webhook_uri | MS_TEAMS_WEBHOOK_URI
+            ${{ secrets.VAULT_PATH_STORE_SW6 }} ms_teams_webhook_uri | MS_TEAMS_WEBHOOK_URI
 
       - name: Notify teams on failure
         if: failure()
