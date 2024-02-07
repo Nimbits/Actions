@@ -30,7 +30,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4.0.1
         with:
-          node-version: '20'  
+          node-version: '16'  
           npm-version: '10'  
   
       - name: Install jq
@@ -71,6 +71,8 @@ jobs:
           [ -d .node_modules ] && mv .node_modules temp/
           find . -maxdepth 1 ! -name ${{ github.event.repository.name }} ! -name temp -exec mv {} ${{ github.event.repository.name }} \;
           zip -r ${{ github.event.repository.name }}.zip ${{ github.event.repository.name }}  
+        env:
+          NODE_OPTIONS: --openssl-legacy-provider
 
       - name: Upload binaries to release
         uses: svenstaro/upload-release-action@2.7.0
