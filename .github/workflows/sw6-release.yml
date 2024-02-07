@@ -25,7 +25,9 @@ jobs:
         uses: FriendsOfShopware/shopware-cli-action@v1
 
       - name: Build and Package Extension
-        run: shopware-cli extension zip . --release --output-directory ${{ inputs.repo_name }}
+        run: |
+          export NODE_OPTIONS=--openssl-legacy-provider
+          shopware-cli extension zip . --release --output-directory ${{ inputs.repo_name }}
 
       - name: Upload binaries to release
         uses: svenstaro/upload-release-action@2.7.0
