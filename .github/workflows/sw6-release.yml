@@ -21,34 +21,11 @@ jobs:
         with:
           fetch-depth: 0
   
-      - name: Get latest tag
-        id: latest_tag
-        uses: actions-ecosystem/action-get-latest-tag@v1.6.0
-        env:
-          GITHUB_TOKEN: ${{ inputs.GITHUB_TOKEN }}
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4.0.1
-        with:
-          node-version: '20'  
-          npm-version: '10'  
-  
-      - name: Install jq
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y jq
-        shell: bash
-  
-      - name: Update version in composer.json
-        run: |
-          jq '.version = "${{ steps.latest_tag.outputs.tag }}"' composer.json > composer.tmp.json
-          mv composer.tmp.json composer.json
-  
       - name: Shopware CLI Action
         uses: FriendsOfShopware/shopware-cli-action@v1
 
       - name: Build and Package Extension
-        run: shopware-cli extension zip .
+        run: shopware-cli extension zip . --release --output-directory ${{ inputs.repo_name }}
 
       - name: Upload binaries to release
         uses: svenstaro/upload-release-action@2.7.0
