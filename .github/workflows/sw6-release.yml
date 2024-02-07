@@ -47,12 +47,11 @@ jobs:
       - name: Shopware CLI Action
         uses: FriendsOfShopware/shopware-cli-action@v1.0.3
         with:
-          extensionName: ${{ input.repo_name }}
+          extensionName: ${{ inputs.repo_name }}
   
       - name: Build & create zip # todo: Improve this step
         run: |
           rm -f package-lock.json 
-          mkdir ${{ input.repo_name }}
           mkdir temp
           [ -d completions ] && mv completions temp/
           [ -d .github ] && mv .github temp/
