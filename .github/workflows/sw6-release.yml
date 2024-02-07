@@ -33,7 +33,6 @@ jobs:
       
           mv composer.json temp-keep/
           mv src temp-keep/
-          mv tests temp-keep/
       
           find . -mindepth 1 ! -regex '^./temp-keep\(/.*\)?' -delete
       
