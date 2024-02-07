@@ -50,13 +50,6 @@ jobs:
           find . -maxdepth 1 ! -name ${{ inputs.repo_name }} ! -name temp -exec mv {} ${{ inputs.repo_name }} \;
           zip -r ${{ inputs.repo_name }}.zip ${{ inputs.repo_name }}  
 
-      - name: Rename ZIP File
-        run: |
-          ZIP_FILE=$(ls *.zip)
-          echo "Found ZIP file: $ZIP_FILE"
-          mv "$ZIP_FILE" "${{ inputs.repo_name }}.zip"
-          echo "Renamed $ZIP_FILE to ${{ inputs.repo_name }}.zip"
-
       - name: Upload binaries to release
         uses: svenstaro/upload-release-action@2.7.0
         with:
