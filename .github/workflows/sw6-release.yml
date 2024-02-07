@@ -45,24 +45,10 @@ jobs:
           mv composer.tmp.json composer.json
   
       - name: Shopware CLI Action
-        uses: FriendsOfShopware/shopware-cli-action@v1.0.3
-        
-      - name: Build & create zip # todo: Improve this step
-        run: |
-          rm -f package-lock.json 
-          mkdir temp
-          [ -d completions ] && mv completions temp/
-          [ -d .github ] && mv .github temp/
-          [ -d Tests ] && mv Tests temp/
-          [ -d vendor ] && mv vendor temp/
-          [ -f CHANGELOG.md ] && mv CHANGELOG.md temp/
-          [ -f README.md  ] && mv README.md temp/
-          [ -f .gitignore ] && mv .gitignore temp/
-          [ -f phpunit.xml ] && mv phpunit.xml temp/
-          [ -d .husky ] && mv .husky temp/
-          [ -d .node_modules ] && mv .node_modules temp/
-          rm -rf temp
-          shopware-cli extension zip .
+        uses: FriendsOfShopware/shopware-cli-action@v1
+
+      - name: Build and Package Extension
+        run: shopware-cli extension zip .
 
       - name: Upload binaries to release
         uses: svenstaro/upload-release-action@2.7.0
