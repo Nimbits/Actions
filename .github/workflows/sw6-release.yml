@@ -29,7 +29,6 @@ jobs:
 
       - name: Prepare and Zip
         run: |
-          # Erstelle ein temporäres Verzeichnis für die zu behaltenden Dateien und Ordner
           mkdir temp-keep
       
           mv composer.json temp-keep/
@@ -41,7 +40,7 @@ jobs:
           mv temp-keep/* .
           rmdir temp-keep
           
-          zip -r ${{ inputs.repo_name }}.zip composer.json src tests
+          zip -r ${{ inputs.repo_name }}.zip composer.json src
 
       - name: Upload binaries to release
         uses: svenstaro/upload-release-action@2.7.0
