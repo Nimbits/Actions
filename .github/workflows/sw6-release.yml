@@ -16,10 +16,10 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4.1.1
+      - name: Checkout
+        uses: actions/checkout@v3
         with:
-          fetch-depth: 0  # fetch the entire history to make sure we can check tags
+          fetch-depth: 0
   
       - name: Get latest tag
         id: latest_tag
@@ -30,7 +30,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4.0.1
         with:
-          node-version: '16'  
+          node-version: '20'  
           npm-version: '10'  
   
       - name: Install jq
@@ -44,21 +44,16 @@ jobs:
           jq '.version = "${{ steps.latest_tag.outputs.tag }}"' composer.json > composer.tmp.json
           mv composer.tmp.json composer.json
   
-      - name: Install shopware-cli
-        run: |
-          wget https://github.com/Nimbits/Actions/raw/master/bin/shopware-cli_Linux_x86_64.tar.gz
-          tar xzf shopware-cli_Linux_x86_64.tar.gz
-          chmod +x shopware-cli
+      - name: Shopware CLI Action
+        uses: FriendsOfShopware/shopware-cli-action@v1.0.3
+        with:
+          extensionName: ${{ input.repo_name }}
   
       - name: Build & create zip # todo: Improve this step
         run: |
           rm -f package-lock.json 
-          ./shopware-cli extension zip --release .
-          mkdir ${{ github.event.repository.name }}
+          mkdir ${{ input.repo_name }}
           mkdir temp
-          [ -f shopware-cli_Linux_x86_64.tar.gz ] && mv shopware-cli_Linux_x86_64.tar.gz temp/
-          [ -f shopware-cli ] && mv shopware-cli temp/
-          [ -f ${{ github.event.repository.name }}-*.zip ] && mv ${{ github.event.repository.name }}-*.zip temp/  # Changed here
           [ -d completions ] && mv completions temp/
           [ -d .github ] && mv .github temp/
           [ -d Tests ] && mv Tests temp/
@@ -69,10 +64,8 @@ jobs:
           [ -f phpunit.xml ] && mv phpunit.xml temp/
           [ -d .husky ] && mv .husky temp/
           [ -d .node_modules ] && mv .node_modules temp/
-          find . -maxdepth 1 ! -name ${{ github.event.repository.name }} ! -name temp -exec mv {} ${{ github.event.repository.name }} \;
-          zip -r ${{ github.event.repository.name }}.zip ${{ github.event.repository.name }}  
-        env:
-          NODE_OPTIONS: --openssl-legacy-provider
+          rm -rf temp
+          shopware-cli extension zip .
 
       - name: Upload binaries to release
         uses: svenstaro/upload-release-action@2.7.0
