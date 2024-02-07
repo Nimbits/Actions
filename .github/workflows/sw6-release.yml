@@ -26,29 +26,22 @@ jobs:
         uses: actions-ecosystem/action-get-latest-tag@v1.6.0
         env:
           GITHUB_TOKEN: ${{ inputs.GITHUB_TOKEN }}
-  
-      - name: Shopware CLI Action
-        uses: FriendsOfShopware/shopware-cli-action@v1
 
-      - name: Build and Package Extension
+      - name: Prepare and Zip
         run: |
-          export NODE_OPTIONS=--openssl-legacy-provider
-          #shopware-cli extension zip . --release
-          mkdir ${{ inputs.repo_name }}
-          mkdir temp
-          [ -f ${{ inputs.repo_name }}-*.zip ] && mv ${{ inputs.repo_name }}-*.zip temp/ 
-          [ -d completions ] && mv completions temp/
-          [ -d .github ] && mv .github temp/
-          [ -d Tests ] && mv Tests temp/
-          [ -d vendor ] && mv vendor temp/
-          [ -f CHANGELOG.md ] && mv CHANGELOG.md temp/
-          [ -f README.md  ] && mv README.md temp/
-          [ -f .gitignore ] && mv .gitignore temp/
-          [ -f phpunit.xml ] && mv phpunit.xml temp/
-          [ -d .husky ] && mv .husky temp/
-          [ -d .node_modules ] && mv .node_modules temp/
-          find . -maxdepth 1 ! -name ${{ inputs.repo_name }} ! -name temp -exec mv {} ${{ inputs.repo_name }} \;
-          zip -r ${{ inputs.repo_name }}.zip ${{ inputs.repo_name }}  
+          # Erstelle ein temporäres Verzeichnis für die zu behaltenden Dateien und Ordner
+          mkdir temp-keep
+      
+          mv composer.json temp-keep/
+          mv src temp-keep/
+          mv tests temp-keep/
+      
+          find . -mindepth 1 ! -regex '^./temp-keep\(/.*\)?' -delete
+      
+          mv temp-keep/* .
+          rmdir temp-keep
+          
+          zip -r ${{ inputs.repo_name }}.zip composer.json src tests
 
       - name: Upload binaries to release
         uses: svenstaro/upload-release-action@2.7.0
