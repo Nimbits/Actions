@@ -29,13 +29,15 @@ jobs:
 
       - name: Prepare and Zip
         run: |
-          mkdir temp-keep
-          mv composer.json temp-keep/
-          mv src temp-keep/
-          find . -mindepth 1 ! -regex '^./temp-keep\(/.*\)?' -delete
-          mv temp-keep/* .
-          rmdir temp-keep
-          zip -r ${{ inputs.repo_name }}.zip composer.json src
+          mkdir -p "${{ inputs.repo_name }}"
+
+          mv composer.json "${{ inputs.repo_name }}/"
+          mv src "${{ inputs.repo_name }}/"
+          
+          # Find and delete all other files and directories at the root, except for the ${{ inputs.repo_name }} directory
+          find . -mindepth 1 ! -regex "^./${{ inputs.repo_name }}\(/.*\)?$" -delete
+          zip -r "${{ inputs.repo_name }}.zip" "${{ inputs.repo_name }}"
+
 
       - name: Upload binaries to release
         uses: svenstaro/upload-release-action@2.7.0
