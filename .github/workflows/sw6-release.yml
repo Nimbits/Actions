@@ -36,7 +36,7 @@ jobs:
           
           # Find and delete all other files and directories at the root, except for the ${{ inputs.repo_name }} directory
           find . -mindepth 1 ! -regex "^./${{ inputs.repo_name }}\(/.*\)?$" -delete
-          zip -r "${{ inputs.repo_name }}.zip" "${{ inputs.repo_name }}"
+          zip -r "${{ inputs.repo_name }}-${{ steps.latest_tag.outputs.tag }}.zip" "${{ inputs.repo_name }}"
 
 
       - name: Upload binaries to release
