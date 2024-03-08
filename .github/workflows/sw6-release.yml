@@ -44,7 +44,7 @@ jobs:
         uses: svenstaro/upload-release-action@2.7.0
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
-          file: /tmp/${{ inputs.repo_name }}.zip
+          file: /tmp/${{ inputs.repo_name }}-${{ steps.latest_tag.outputs.tag }}.zip
           asset_name: ${{ inputs.repo_name }}.zip
           tag: ${{ steps.latest_tag.outputs.tag }}
           overwrite: false
