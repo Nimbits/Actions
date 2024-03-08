@@ -17,7 +17,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
@@ -29,21 +29,21 @@ jobs:
 
       - name: Prepare and Zip
         run: |
-          mkdir -p "${{ inputs.repo_name }}"
+          mkdir -p "/tmp/${{ inputs.repo_name }}"
 
-          mv composer.json "${{ inputs.repo_name }}/"
-          mv src "${{ inputs.repo_name }}/"
+          mv composer.json "/tmp/${{ inputs.repo_name }}/"
+          mv src "/tmp/${{ inputs.repo_name }}/"
           
           # Find and delete all other files and directories at the root, except for the ${{ inputs.repo_name }} directory
-          find . -mindepth 1 ! -regex "^./${{ inputs.repo_name }}\(/.*\)?$" -delete
-          zip -r "${{ inputs.repo_name }}-${{ steps.latest_tag.outputs.tag }}.zip" "${{ inputs.repo_name }}"
+          find /tmp -mindepth 1 ! -regex "^/tmp/${{ inputs.repo_name }}\(/.*\)?$" -delete
+          zip -r "/tmp/${{ inputs.repo_name }}-${{ steps.latest_tag.outputs.tag }}.zip" "${{ inputs.repo_name }}"
 
 
       - name: Upload binaries to release
         uses: svenstaro/upload-release-action@2.7.0
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
-          file: ./${{ inputs.repo_name }}.zip
+          file: /tmp/${{ inputs.repo_name }}.zip
           asset_name: ${{ inputs.repo_name }}.zip
           tag: ${{ steps.latest_tag.outputs.tag }}
           overwrite: false
