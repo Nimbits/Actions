@@ -40,7 +40,7 @@ jobs:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
           file: /tmp/${{ inputs.repo_name }}-${{ github.ref_name }}.zip
           asset_name: ${{ inputs.repo_name }}.zip
-          tag: ${{ steps.latest_tag.outputs.tag }}
+          tag: ${{ github.ref_name }}
           overwrite: false
 
       - name: Fetch secrets from Vault for testing
