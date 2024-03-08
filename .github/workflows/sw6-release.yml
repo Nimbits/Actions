@@ -30,13 +30,13 @@ jobs:
       - name: Prepare and Zip
         run: |
           echo "Testbranch"
-          mkdir -p "/tmp/${{ inputs.repo_name }}"
+          mkdir -p "${{ inputs.repo_name }}"
       
-          mv composer.json "/tmp/${{ inputs.repo_name }}/"
-          mv src "/tmp/${{ inputs.repo_name }}/"
+          mv composer.json "${{ inputs.repo_name }}/"
+          mv src "${{ inputs.repo_name }}/"
           
           # Find and delete all other files and directories at the root, except for the ${{ inputs.repo_name }} directory
-          find /tmp -mindepth 1 ! -regex "^/tmp/${{ inputs.repo_name }}\(/.*\)?$" -delete
+          find . -mindepth 1 ! -regex "^./${{ inputs.repo_name }}\(/.*\)?$" -delete
           zip -r "/tmp/${{ inputs.repo_name }}-${{ steps.latest_tag.outputs.tag }}.zip" "${{ inputs.repo_name }}"
 
 
