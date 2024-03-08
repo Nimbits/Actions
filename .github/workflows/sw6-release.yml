@@ -17,7 +17,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v3
         with:
           fetch-depth: 0
 
@@ -29,8 +29,9 @@ jobs:
 
       - name: Prepare and Zip
         run: |
+          echo "Testbranch"
           mkdir -p "/tmp/${{ inputs.repo_name }}"
-
+      
           mv composer.json "/tmp/${{ inputs.repo_name }}/"
           mv src "/tmp/${{ inputs.repo_name }}/"
           
