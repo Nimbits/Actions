@@ -23,7 +23,6 @@ jobs:
 
       - name: Prepare and Zip
         run: |
-          echo "Testbranch"
           mkdir -p "${{ inputs.repo_name }}"
       
           mv composer.json "${{ inputs.repo_name }}/"
