@@ -21,31 +21,25 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Get latest tag
-        id: latest_tag
-        uses: actions-ecosystem/action-get-latest-tag@v1.6.0
-        env:
-          GITHUB_TOKEN: ${{ inputs.GITHUB_TOKEN }}
-
       - name: Prepare and Zip
         run: |
           mkdir -p "${{ inputs.repo_name }}"
-
+      
           mv composer.json "${{ inputs.repo_name }}/"
           mv src "${{ inputs.repo_name }}/"
           
           # Find and delete all other files and directories at the root, except for the ${{ inputs.repo_name }} directory
           find . -mindepth 1 ! -regex "^./${{ inputs.repo_name }}\(/.*\)?$" -delete
-          zip -r "${{ inputs.repo_name }}-${{ steps.latest_tag.outputs.tag }}.zip" "${{ inputs.repo_name }}"
+          zip -r "/tmp/${{ inputs.repo_name }}-${{ github.ref_name }}.zip" "${{ inputs.repo_name }}"
 
 
       - name: Upload binaries to release
         uses: svenstaro/upload-release-action@2.7.0
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
-          file: ./${{ inputs.repo_name }}.zip
+          file: /tmp/${{ inputs.repo_name }}-${{ github.ref_name }}.zip
           asset_name: ${{ inputs.repo_name }}.zip
-          tag: ${{ steps.latest_tag.outputs.tag }}
+          tag: ${{ github.ref_name }}
           overwrite: false
 
       - name: Fetch secrets from Vault for testing
