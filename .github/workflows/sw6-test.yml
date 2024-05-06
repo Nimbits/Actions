@@ -11,8 +11,8 @@ on:
       php-version:
         description: 'PHP version for PHPStan'
         required: false
-        default: '8.2'
-        type: 'string'
+        default: 8.2
+        type: 'number'
     secrets:
       CURR_VAULT_PATH:
         required: true
