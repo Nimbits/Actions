@@ -12,7 +12,7 @@ on:
         description: 'PHP version for PHPStan'
         required: false
         default: 8.2
-        type: 'number'
+        type: number
     secrets:
       CURR_VAULT_PATH:
         required: true
@@ -75,7 +75,7 @@ jobs:
         with:
           path: src/
           level: ${{ inputs.phpstan-level }}
-          php_version: ${{ inputs.php-version }}
+          php_version: 8.2
 
       - name: Fetch secrets from Vault for testing
         id: fetch_secrets
