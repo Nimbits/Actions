@@ -11,8 +11,8 @@ on:
       php-version:
         description: 'PHP version for PHPStan'
         required: false
-        default: 8.2
-        type: number
+        default: "8.2"
+        type: string
     secrets:
       CURR_VAULT_PATH:
         required: true
@@ -65,9 +65,13 @@ jobs:
       - name: Configure GitHub token #needed for vcs dependencies
         run: composer config --global --auth github-oauth.github.com ${{ secrets.DEPENDENCY_TOKEN }}
 
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ inputs.php-version }}
+
       - name: Install dependencies
         run: |
-          [ -f composer.lock ] && rm composer.lock
           composer install
 
       - name: PHPStan
@@ -75,7 +79,7 @@ jobs:
         with:
           path: src/
           level: ${{ inputs.phpstan-level }}
-          php_version: 8.2
+          php_version: ${{ inputs.php-version }}
 
       - name: Fetch secrets from Vault for testing
         id: fetch_secrets
