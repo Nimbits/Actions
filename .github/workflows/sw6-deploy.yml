@@ -86,7 +86,7 @@ jobs:
 
       - name: Set SSH Port
         run: |
-          if [ -n "${{ steps.fetch_ssh_port.outputs.SSH_PORT }}" ]; then
+          if [ "${{ steps.fetch_ssh_port.outcome }}" == "success" ] && [ -n "${{ steps.fetch_ssh_port.outputs.SSH_PORT }}" ]; then
             echo "SSH_PORT=${{ steps.fetch_ssh_port.outputs.SSH_PORT }}" >> $GITHUB_ENV
           else
             echo "SSH_PORT=22" >> $GITHUB_ENV
