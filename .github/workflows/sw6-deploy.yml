@@ -29,126 +29,144 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4.1.1
-      with:
-        fetch-depth: 0
+      - name: Checkout code
+        uses: actions/checkout@v4.1.1
+        with:
+          fetch-depth: 0
 
-    - name: Get latest tag
-      id: latest_tag
-      uses: actions-ecosystem/action-get-latest-tag@v1.6.0
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Get latest tag
+        id: latest_tag
+        uses: actions-ecosystem/action-get-latest-tag@v1.6.0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-    - name: Install jq
-      run: sudo apt-get update && sudo apt-get install -y jq
+      - name: Install jq
+        run: sudo apt-get update && sudo apt-get install -y jq
 
-    - name: Validate tag format
-      if: inputs.check_tag
-      run: |
-        if ! [[ "${{ steps.latest_tag.outputs.tag }}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-          echo "Tag does not match the format '[0-9]+.[0-9]+.[0-9]+'! Consider removing the tag."
-          exit 1
-        fi
+      - name: Validate tag format
+        if: inputs.check_tag
+        run: |
+          if ! [[ "${{ steps.latest_tag.outputs.tag }}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Tag does not match the format '[0-9]+.[0-9]+.[0-9]+'! Consider removing the tag."
+            exit 1
+          fi
 
-    - name: Update version in composer.json
-      if: inputs.is_prod
-      run: jq '.version = "${{ steps.latest_tag.outputs.tag }}"' composer.json > composer.tmp.json && mv composer.tmp.json composer.json
+      - name: Update version in composer.json
+        if: inputs.is_prod
+        run: jq '.version = "${{ steps.latest_tag.outputs.tag }}"' composer.json > composer.tmp.json && mv composer.tmp.json composer.json
 
-    - name: Remove unnecessary files
-      run: |
-        rm -rf README.md .git* .eslint* .env* .prettier* .husky commitlint.config.js
+      - name: Remove unnecessary files
+        run: |
+          rm -rf README.md .git* .eslint* .env* .prettier* .husky commitlint.config.js
 
-    - name: Fetch secrets from Vault for deployment
-      id: fetch_secrets
-      uses: hashicorp/vault-action@v2.7.4
-      with:
-        url: ${{ vars.VAULT_SERVER }}
-        method: token
-        token: ${{ secrets.CURR_VAULT_TOKEN }}
-        secrets: |
-          ${{ secrets.CURR_VAULT_PATH }} remote_host | REMOTE_HOST ;
-          ${{ secrets.CURR_VAULT_PATH }} remote_user | REMOTE_USER ;
-          ${{ secrets.CURR_VAULT_PATH }} remote_pwd | REMOTE_PWD ;
-          ${{ secrets.CURR_VAULT_PATH }} ${{ inputs.is_prod && 'prod_path' || 'dev_path' }} | REMOTE_PATH ;
-          ${{ secrets.CURR_VAULT_PATH }} ms_teams_webhook_uri | MS_TEAMS_WEBHOOK_URI
+      - name: Fetch mandatory secrets from Vault
+        id: fetch_mandatory_secrets
+        uses: hashicorp/vault-action@v2.7.4
+        with:
+          url: ${{ vars.VAULT_SERVER }}
+          method: token
+          token: ${{ secrets.CURR_VAULT_TOKEN }}
+          secrets: |
+            ${{ secrets.CURR_VAULT_PATH }} remote_host | REMOTE_HOST ;
+            ${{ secrets.CURR_VAULT_PATH }} remote_user | REMOTE_USER ;
+            ${{ secrets.CURR_VAULT_PATH }} remote_pwd | REMOTE_PWD ;
+            ${{ secrets.CURR_VAULT_PATH }} ${{ inputs.is_prod && 'prod_path' || 'dev_path' }} | REMOTE_PATH ;
+            ${{ secrets.CURR_VAULT_PATH }} ms_teams_webhook_uri | MS_TEAMS_WEBHOOK_URI
 
-    - name: Create Deployment
-      if: success()
-      id: deployment
-      uses: bobheadxi/deployments@v1.4.0
-      with:
-        step: start
-        token: ${{ secrets.GITHUB_TOKEN }}
-        env: ${{ inputs.is_prod && 'Production' || 'Development' }}
-        ref: ${{ github.ref }}
-        no_override: true
-        #env_url: todo: URL
-        auto_inactive: true
+      - name: Fetch optional SSH port from Vault
+        id: fetch_ssh_port
+        continue-on-error: true
+        uses: hashicorp/vault-action@v2.7.4
+        with:
+          url: ${{ vars.VAULT_SERVER }}
+          method: token
+          token: ${{ secrets.CURR_VAULT_TOKEN }}
+          secrets: |
+            ${{ secrets.CURR_VAULT_PATH }} ssh_port | SSH_PORT
 
-    - name: Deployment to temporary directory
-      uses: appleboy/scp-action@v0.1.4
-      with:
+      - name: Set SSH Port
+        run: |
+          if [ -n "${{ steps.fetch_ssh_port.outputs.SSH_PORT }}" ]; then
+            echo "SSH_PORT=${{ steps.fetch_ssh_port.outputs.SSH_PORT }}" >> $GITHUB_ENV
+          else
+            echo "SSH_PORT=22" >> $GITHUB_ENV
+          fi
+        shell: bash
+
+      - name: Create Deployment
+        if: success()
+        id: deployment
+        uses: bobheadxi/deployments@v1.4.0
+        with:
+          step: start
+          token: ${{ secrets.GITHUB_TOKEN }}
+          env: ${{ inputs.is_prod && 'Production' || 'Development' }}
+          ref: ${{ github.ref }}
+          no_override: true
+          #env_url: todo: add URL to show deployment website
+          auto_inactive: true
+
+      - name: Deployment to temporary directory
+        uses: appleboy/scp-action@v0.1.4
+        with:
           host: ${{ env.REMOTE_HOST }}
-          port: 22
+          port: ${{ env.SSH_PORT }}
           username: ${{ env.REMOTE_USER }}
           password: ${{ env.REMOTE_PWD }}
           target: ${{ env.REMOTE_PATH }}/ci_temp/${{ inputs.repo_name }}
           source: ./*
           strip_components: 0
 
-    - name: Replace old directory with new one
-      uses: appleboy/ssh-action@v1.0.0
-      with:
-        host: ${{ env.REMOTE_HOST }}
-        port: 22
-        username: ${{ env.REMOTE_USER }}
-        password: ${{ env.REMOTE_PWD }}
-        script: |
-          rm -rf ${{ env.REMOTE_PATH }}/${{ inputs.custom_relative_path }}${{ inputs.repo_name }}
-          mv ${{ env.REMOTE_PATH }}/ci_temp/${{ inputs.repo_name }} ${{ env.REMOTE_PATH }}/${{ inputs.custom_relative_path }}${{ inputs.repo_name }}
-    
-    - name: Clear Cache & Theme compile & Assets install
-      uses: appleboy/ssh-action@v1.0.0
-      with:
-        host: ${{ env.REMOTE_HOST }}
-        port: 22
-        username: ${{ env.REMOTE_USER }}
-        password: ${{ env.REMOTE_PWD }}
-        script: |
-          cd ${{ env.REMOTE_PATH }}
-          bin/console cache:clear
-          bin/console theme:compile
-          bin/console assets:install
+      - name: Replace old directory with new one
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: ${{ env.REMOTE_HOST }}
+          port: ${{ env.SSH_PORT }}
+          username: ${{ env.REMOTE_USER }}
+          password: ${{ env.REMOTE_PWD }}
+          script: |
+            rm -rf ${{ env.REMOTE_PATH }}/${{ inputs.custom_relative_path }}${{ inputs.repo_name }}
+            mv ${{ env.REMOTE_PATH }}/ci_temp/${{ inputs.repo_name }} ${{ env.REMOTE_PATH }}/${{ inputs.custom_relative_path }}${{ inputs.repo_name }}
 
-    - name: Notify teams on success
-      if: success() && inputs.is_prod
-      uses: jdcargile/ms-teams-notification@v1.3
-      with:
-        github-token: ${{ secrets.GITHUB_TOKEN }}
-        ms-teams-webhook-uri: ${{ env.MS_TEAMS_WEBHOOK_URI }}
-        notification-summary: '[PROD] Deployment successful!'
-        notification-color: '3FBA50' # Green
-        timezone: Europe/Berlin
+      - name: Clear Cache & Theme compile & Assets install
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: ${{ env.REMOTE_HOST }}
+          port: ${{ env.SSH_PORT }}
+          username: ${{ env.REMOTE_USER }}
+          password: ${{ env.REMOTE_PWD }}
+          script: |
+            cd ${{ env.REMOTE_PATH }}
+            bin/console cache:clear
+            bin/console theme:compile
+            bin/console assets:install
 
-    - name: update deployment status
-      uses: bobheadxi/deployments@v1.4.0
-      if: always()
-      with:
-        step: finish
-        token: ${{ secrets.GITHUB_TOKEN }}
-        status: ${{ job.status }}
-        env: ${{ steps.deployment.outputs.env }}
-        deployment_id: ${{ steps.deployment.outputs.deployment_id }}
+      - name: Notify teams on success
+        if: success() && inputs.is_prod
+        uses: jdcargile/ms-teams-notification@v1.3
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          ms-teams-webhook-uri: ${{ env.MS_TEAMS_WEBHOOK_URI }}
+          notification-summary: '[PROD] Deployment successful!'
+          notification-color: '3FBA50' # Green
+          timezone: Europe/Berlin
 
+      - name: update deployment status
+        uses: bobheadxi/deployments@v1.4.0
+        if: always()
+        with:
+          step: finish
+          token: ${{ secrets.GITHUB_TOKEN }}
+          status: ${{ job.status }}
+          env: ${{ steps.deployment.outputs.env }}
+          deployment_id: ${{ steps.deployment.outputs.deployment_id }}
 
-    - name: Notify teams on failure
-      if: failure()
-      uses: jdcargile/ms-teams-notification@v1.3
-      with:
-        github-token: ${{ secrets.GITHUB_TOKEN }}
-        ms-teams-webhook-uri: ${{ env.MS_TEAMS_WEBHOOK_URI }}
-        notification-summary: ${{ inputs.is_prod && '[PROD] Deployment failed!' || 'Deployment to Dev-Environment failed.' }}
-        notification-color: ${{ inputs.is_prod && 'F85149' || 'F88F49' }}  # Red / Orange
-        timezone: Europe/Berlin
-
+      - name: Notify teams on failure
+        if: failure()
+        uses: jdcargile/ms-teams-notification@v1.3
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          ms-teams-webhook-uri: ${{ env.MS_TEAMS_WEBHOOK_URI }}
+          notification-summary: ${{ inputs.is_prod && '[PROD] Deployment failed!' || 'Deployment to Dev-Environment failed.' }}
+          notification-color: ${{ inputs.is_prod && 'F85149' || 'F88F49' }}  # Red / Orange
+          timezone: Europe/Berlin
