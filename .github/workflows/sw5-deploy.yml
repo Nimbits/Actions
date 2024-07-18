@@ -130,7 +130,7 @@ jobs:
 
     - name: Notify teams on success
       if: success() && inputs.is_prod
-      uses: jdcargile/ms-teams-notification@v1.3
+      uses: jdcargile/ms-teams-notification@v1.4
       with:
         github-token: ${{ secrets.GITHUB_TOKEN }}
         ms-teams-webhook-uri: ${{ env.MS_TEAMS_WEBHOOK_URI }}
@@ -141,7 +141,7 @@ jobs:
 
     - name: Notify teams on failure
       if: failure()
-      uses: jdcargile/ms-teams-notification@v1.3
+      uses: jdcargile/ms-teams-notification@v1.4
       with:
         github-token: ${{ secrets.GITHUB_TOKEN }}
         ms-teams-webhook-uri: ${{ env.MS_TEAMS_WEBHOOK_URI }}
