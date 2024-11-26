@@ -3,6 +3,10 @@ name: Deploy to Shopware 6
 on:
   workflow_call:
     inputs:
+      php_binary:
+        required: false
+        type: 'string'
+        default: 'php'
       is_prod:
         required: false
         type: boolean
@@ -137,9 +141,9 @@ jobs:
           password: ${{ env.REMOTE_PWD }}
           script: |
             cd ${{ env.REMOTE_PATH }}
-            bin/console cache:clear
-            bin/console theme:compile
-            bin/console assets:install
+            ${{ inputs.php_binary }} bin/console cache:clear
+            ${{ inputs.php_binary }} bin/console theme:compile
+            ${{ inputs.php_binary }} bin/console assets:install
 
       - name: Notify teams on success
         if: success() && inputs.is_prod
