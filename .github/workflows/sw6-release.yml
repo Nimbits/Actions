@@ -30,11 +30,11 @@ jobs:
           mv src "${{ inputs.repo_name }}/"
 
           # Delete js folder and files to prevent leaking JavaScript code
-          rm -rf "${{ inputs.repo_name }}/src/Resources/app/storefront/src/js"
-          rm -f "${{ inputs.repo_name }}/src/Resources/app/storefront/src/main.js"
+          #rm -rf "${{ inputs.repo_name }}/src/Resources/app/storefront/src/js"
+          #rm -f "${{ inputs.repo_name }}/src/Resources/app/storefront/src/main.js"
 
           # Delete Administration (Erlebniswelten) files
-          rm -rf "${{ inputs.repo_name }}/src/Resources/app/administration/src"
+          #rm -rf "${{ inputs.repo_name }}/src/Resources/app/administration/src"
           
           # Find and delete all other files and directories at the root, except for the ${{ inputs.repo_name }} directory
           find . -mindepth 1 ! -regex "^./${{ inputs.repo_name }}\(/.*\)?$" -delete
