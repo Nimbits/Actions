@@ -95,23 +95,92 @@ jobs:
         run: |
           cd .github/nimbits-cli
           
+          echo "=== Installing CLI dependencies ==="
+          echo "Current directory: $(pwd)"
+          echo "Files in CLI directory:"
+          ls -la
+          
           # Install Node.js dependencies for linting tools
-          pnpm install --frozen-lockfile
+          if [ -f "package.json" ]; then
+            echo "Installing Node.js dependencies..."
+            pnpm install --frozen-lockfile
+          else
+            echo "No package.json found!"
+          fi
           
           # Install PHP dependencies for PHPStan
-          composer install --no-dev --no-interaction
+          if [ -f "composer.json" ]; then
+            echo "Installing PHP dependencies..."
+            echo "Composer.json content:"
+            cat composer.json
+            composer install --no-dev --no-interaction --verbose
+          else
+            echo "No composer.json found!"
+          fi
           
           # Verify installations
           echo "=== CLI Tools Verification ==="
-          ls -la vendor/bin/phpstan && echo "✓ PHPStan found" || echo "✗ PHPStan missing"
-          ls -la node_modules/.bin/eslint && echo "✓ ESLint found" || echo "✗ ESLint missing"
-          ls -la node_modules/.bin/stylelint && echo "✓ Stylelint found" || echo "✗ Stylelint missing"
+          echo "Checking vendor directory:"
+          ls -la vendor/ || echo "No vendor directory"
+          echo "Checking vendor/bin directory:"
+          ls -la vendor/bin/ || echo "No vendor/bin directory"
+          echo "Checking node_modules/.bin directory:"
+          ls -la node_modules/.bin/ || echo "No node_modules/.bin directory"
+          
+          # Check specific tools
+          if [ -f "vendor/bin/phpstan" ]; then
+            echo "✓ PHPStan found at vendor/bin/phpstan"
+            ./vendor/bin/phpstan --version
+          else
+            echo "✗ PHPStan missing"
+          fi
+          
+          if [ -f "node_modules/.bin/eslint" ]; then
+            echo "✓ ESLint found"
+          else
+            echo "✗ ESLint missing"
+          fi
+          
+          if [ -f "node_modules/.bin/stylelint" ]; then
+            echo "✓ Stylelint found"
+          else
+            echo "✗ Stylelint missing"
+          fi
           
           cd ../..
+
+      - name: Debug project structure
+        run: |
+          echo "=== Project Structure Debug ==="
+          echo "Current directory: $(pwd)"
+          echo "Project files:"
+          ls -la
+          echo "Source directory:"
+          ls -la src/ || echo "No src directory"
+          echo "CLI directory exists:"
+          ls -la .github/nimbits-cli/ || echo "No CLI directory"
 
       - name: Run PHPStan
         run: |
           echo "🔍 Running PHPStan analysis (level ${{ inputs.phpstan-level }})..."
+          
+          # Check if PHPStan exists
+          if [ ! -f ".github/nimbits-cli/vendor/bin/phpstan" ]; then
+            echo "ERROR: PHPStan not found at .github/nimbits-cli/vendor/bin/phpstan"
+            echo "Available files in CLI vendor/bin:"
+            ls -la .github/nimbits-cli/vendor/bin/ || echo "No vendor/bin directory"
+            exit 1
+          fi
+          
+          # Check if config exists
+          if [ ! -f ".github/nimbits-cli/configs/phpstan.neon" ]; then
+            echo "ERROR: PHPStan config not found"
+            echo "Available configs:"
+            ls -la .github/nimbits-cli/configs/ || echo "No configs directory"
+            exit 1
+          fi
+          
+          # Run PHPStan
           .github/nimbits-cli/vendor/bin/phpstan analyse src \
             --configuration=.github/nimbits-cli/configs/phpstan.neon \
             --level=${{ inputs.phpstan-level }} \
