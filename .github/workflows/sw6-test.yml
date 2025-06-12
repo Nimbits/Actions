@@ -168,17 +168,11 @@ jobs:
           echo "🔍 Running ESLint analysis..."
           # Check if JS/Vue files exist
           if find . -name "*.js" -o -name "*.vue" | grep -v node_modules | grep -v vendor | head -1 | read; then
-            cd .github/lint-configs
-            npx eslint \
-              --config=eslint.config.js \
-              ../../. \
-              --ignore-pattern="node_modules/**" \
-              --ignore-pattern="vendor/**" \
-              --ignore-pattern="build/**" \
-              --ignore-pattern="dist/**" \
-              --ignore-pattern="public/**" \
-              --ignore-pattern=".github/**"
-            cd ../..
+            echo "Found JS/Vue files, running ESLint..."
+            # Run ESLint from project root with correct config path
+            npx --prefix .github/lint-configs eslint \
+              --config=.github/lint-configs/eslint.config.js \
+              .
           else
             echo "No JS/Vue files found to lint"
           fi
@@ -188,12 +182,12 @@ jobs:
           echo "🔍 Running Stylelint analysis..."
           # Check if CSS/SCSS files exist
           if find . -name "*.css" -o -name "*.scss" -o -name "*.sass" | grep -v node_modules | grep -v vendor | head -1 | read; then
-            cd .github/lint-configs
-            npx stylelint \
-              --config=.stylelintrc.json \
-              --ignore-path=.stylelintignore \
-              "../../**/*.{css,scss,sass}"
-            cd ../..
+            echo "Found CSS/SCSS files, running Stylelint..."
+            # Run Stylelint from project root with correct config path
+            npx --prefix .github/lint-configs stylelint \
+              --config=.github/lint-configs/.stylelintrc.json \
+              --ignore-path=.github/lint-configs/.stylelintignore \
+              "**/*.{css,scss,sass}"
           else
             echo "No CSS/SCSS files found to lint"
           fi
