@@ -413,7 +413,15 @@ jobs:
           # Build the message text
           message_parts = test_results + ["", overall_result, "", action_text]
           
-          # Create Teams adaptive card payload
+          # Add mention to the text if we have email mapping
+          if notify_user and user_email and user_display_name:
+              message_parts.append("")
+              message_parts.append(f"<at>{user_display_name}</at>")
+          
+          # Join all message parts
+          message_text = "<br>".join(message_parts)
+          
+          # Create Teams adaptive card payload with proper mention format
           payload = {
               "@type": "MessageCard",
               "@context": "http://schema.org/extensions",
@@ -441,17 +449,22 @@ jobs:
                           "value": "[Run #${{ github.run_number }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})"
                       }
                   ],
-                  "markdown": True
+                  "markdown": True,
+                  "text": message_text
+              }],
+              "potentialAction": [{
+                  "@type": "OpenUri",
+                  "name": "View Workflow Run",
+                  "targets": [{
+                      "os": "default",
+                      "uri": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+                  }]
               }]
           }
           
-          # Add mention to the text if we have email mapping
+          # Add entities at section level if we have a mention
           if notify_user and user_email and user_display_name:
-              message_parts.append("")
-              message_parts.append(f"<at>{user_display_name}</at>")
-          
-              # Add the mention entity
-              payload["entities"] = [{
+              payload["sections"][0]["entities"] = [{
                   "type": "mention",
                   "text": f"<at>{user_display_name}</at>",
                   "mentioned": {
@@ -459,20 +472,6 @@ jobs:
                       "name": user_display_name
                   }
               }]
-          
-          # Join all message parts and add to payload
-          message_text = "<br>".join(message_parts)
-          payload["sections"][0]["text"] = message_text
-          
-          # Add action button
-          payload["potentialAction"] = [{
-              "@type": "OpenUri",
-              "name": "View Workflow Run",
-              "targets": [{
-                  "os": "default",
-                  "uri": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-              }]
-          }]
           
           # Save JSON payload
           with open('teams-payload.json', 'w') as f:
