@@ -364,7 +364,7 @@ jobs:
           MESSAGE="**Shopware Plugin Test Results**\n\n"
           MESSAGE="${MESSAGE}**Repository:** ${{ github.repository }}\n"
           MESSAGE="${MESSAGE}**Branch:** ${{ github.ref_name }}\n"
-          MESSAGE="${MESSAGE}**Commit:** [\`${{ github.sha:0:7 }}\`](${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }})\n"
+          MESSAGE="${MESSAGE}**Commit:** [\`$(echo '${{ github.sha }}' | cut -c1-7)\`](${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }})\n"
           MESSAGE="${MESSAGE}**Workflow:** [Run #${{ github.run_number }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})\n\n"
           MESSAGE="${MESSAGE}**Status:** $STATUS\n\n"
           MESSAGE="${MESSAGE}$SUMMARY"
