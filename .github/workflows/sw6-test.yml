@@ -88,48 +88,66 @@ jobs:
       - name: Install pnpm
         run: npm install -g pnpm
 
-      - name: Install PHP dependencies
+      - name: Install project PHP dependencies
         run: composer install
 
-      - name: Install CLI linting dependencies
+      - name: Install CLI dependencies
         run: |
           cd .github/nimbits-cli
           
-          # Install Node.js dependencies
+          # Install Node.js dependencies for linting tools
           pnpm install --frozen-lockfile
           
-          # Install PHP dependencies (PHPStan)
-          if [ -f "composer.json" ]; then
-            composer install --no-dev --no-interaction
-          fi
+          # Install PHP dependencies for PHPStan
+          composer install --no-dev --no-interaction
           
           # Verify installations
-          echo "=== Verifying CLI tools ==="
-          ls -la vendor/bin/ || echo "No vendor/bin directory"
-          ls -la node_modules/.bin/ || echo "No node_modules/.bin directory"
+          echo "=== CLI Tools Verification ==="
+          ls -la vendor/bin/phpstan && echo "✓ PHPStan found" || echo "✗ PHPStan missing"
+          ls -la node_modules/.bin/eslint && echo "✓ ESLint found" || echo "✗ ESLint missing"
+          ls -la node_modules/.bin/stylelint && echo "✓ Stylelint found" || echo "✗ Stylelint missing"
           
           cd ../..
 
-      - name: Run CLI linting
+      - name: Run PHPStan
         run: |
-          # Set CLI path
-          CLI_PATH="$(pwd)/.github/nimbits-cli/nb.sh"
-          chmod +x "$CLI_PATH"
-          
-          # Export CLI directory for the script
-          export SCRIPT_DIR="$(pwd)/.github/nimbits-cli"
-          
-          # Run PHPStan
-          echo "Running PHPStan analysis..."
-          "$CLI_PATH" lint:php ${{ inputs.phpstan-level }}
-          
-          # Run ESLint
-          echo "Running ESLint analysis..."
-          "$CLI_PATH" lint:js || echo "ESLint completed with issues"
-          
-          # Run Stylelint
-          echo "Running Stylelint analysis..."
-          "$CLI_PATH" lint:css || echo "Stylelint completed with issues"
+          echo "🔍 Running PHPStan analysis (level ${{ inputs.phpstan-level }})..."
+          .github/nimbits-cli/vendor/bin/phpstan analyse src \
+            --configuration=.github/nimbits-cli/configs/phpstan.neon \
+            --level=${{ inputs.phpstan-level }} \
+            --memory-limit=512M \
+            --no-progress
+
+      - name: Run ESLint
+        run: |
+          echo "🔍 Running ESLint analysis..."
+          # Check if JS/Vue files exist
+          JS_FILES=$(find . -name "*.js" -o -name "*.vue" | grep -v node_modules | grep -v vendor | grep -v .github | head -1)
+          if [ -n "$JS_FILES" ]; then
+            cd .github/nimbits-cli
+            npx eslint \
+              --config=configs/eslint.config.js \
+              ../../.
+            cd ../..
+          else
+            echo "No JS/Vue files found to lint"
+          fi
+
+      - name: Run Stylelint
+        run: |
+          echo "🔍 Running Stylelint analysis..."
+          # Check if CSS/SCSS files exist
+          CSS_FILES=$(find . -name "*.css" -o -name "*.scss" -o -name "*.sass" | grep -v node_modules | grep -v vendor | grep -v .github | head -1)
+          if [ -n "$CSS_FILES" ]; then
+            cd .github/nimbits-cli
+            npx stylelint \
+              --config=configs/.stylelintrc.json \
+              --ignore-path=configs/.stylelintignore \
+              "../../**/*.{css,scss,sass}"
+            cd ../..
+          else
+            echo "No CSS/SCSS files found to lint"
+          fi
 
       - name: Fetch secrets from Vault for testing
         id: fetch_secrets
