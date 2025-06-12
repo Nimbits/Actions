@@ -366,7 +366,7 @@ jobs:
           
           print(f"Debug: notify_user={notify_user}, user_email={user_email}, display_name={user_display_name}")
           
-          # Create test results text with proper line breaks
+          # Create test results text with actual newlines
           test_results = []
           
           if os.environ.get('COMPOSER_CHECK_FAILED', 'false') == 'true':
@@ -410,18 +410,20 @@ jobs:
           github_sha = "${{ github.sha }}"
           short_sha = github_sha[:7]
           
-          # Build the message text with proper line breaks for Teams
-          # Using \n\n for visible line breaks in Adaptive Cards
-          message_text = "\\n\\n".join(test_results)
-          message_text += "\\n\\n\\n\\n"  # Extra spacing before overall result
-          message_text += overall_result
-          message_text += "\\n\\n"
-          message_text += action_text
+          # Build the message text with actual newlines (not escaped)
+          message_parts = test_results.copy()
+          message_parts.append("")  # Empty line
+          message_parts.append(overall_result)
+          message_parts.append("")  # Empty line
+          message_parts.append(action_text)
           
           # Add mention if we have a mapping
           if notify_user and user_email and user_display_name:
-              message_text += "\\n\\n\\n\\n"
-              message_text += f"<at>{user_display_name}</at>"
+              message_parts.append("")  # Empty line
+              message_parts.append(f"<at>{user_display_name}</at>")
+          
+          # Join with actual newlines
+          message_text = "\n".join(message_parts)
           
           # Create Adaptive Card payload (required for mentions in webhooks)
           payload = {
