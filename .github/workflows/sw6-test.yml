@@ -410,23 +410,18 @@ jobs:
           github_sha = "${{ github.sha }}"
           short_sha = github_sha[:7]
           
-          # Build the message text with double line breaks for Adaptive Cards
-          message_parts = []
-          for result in test_results:
-              message_parts.append(result)
-              message_parts.append("\\n")
-          
-          message_parts.append("\\n")
-          message_parts.append(overall_result)
-          message_parts.append("\\n\\n")
-          message_parts.append(action_text)
+          # Build the message text with proper line breaks for Teams
+          # Using \n\n for visible line breaks in Adaptive Cards
+          message_text = "\\n\\n".join(test_results)
+          message_text += "\\n\\n\\n\\n"  # Extra spacing before overall result
+          message_text += overall_result
+          message_text += "\\n\\n"
+          message_text += action_text
           
           # Add mention if we have a mapping
           if notify_user and user_email and user_display_name:
-              message_parts.append("\\n\\n")
-              message_parts.append(f"<at>{user_display_name}</at>")
-          
-          message_text = "".join(message_parts)
+              message_text += "\\n\\n\\n\\n"
+              message_text += f"<at>{user_display_name}</at>"
           
           # Create Adaptive Card payload (required for mentions in webhooks)
           payload = {
