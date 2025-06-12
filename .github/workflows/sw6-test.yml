@@ -399,6 +399,18 @@ jobs:
           # Export the user mapping to environment variable for Python
           export TEAMS_USER_MAPPING="${{ vars.TEAMS_USER_MAPPING }}"
           
+          # Determine the author to notify
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            # For PRs, use the PR author
+            AUTHOR_USERNAME="${{ github.event.pull_request.user.login }}"
+          else
+            # For direct pushes, use the commit author
+            AUTHOR_USERNAME="${{ github.actor }}"
+          fi
+          
+          echo "📧 Will notify author: $AUTHOR_USERNAME"
+          export NOTIFY_USER="$AUTHOR_USERNAME"
+          
           # Create custom Teams webhook payload
           cat > teams-payload.json << EOF
           {
@@ -463,14 +475,11 @@ jobs:
           
           # Prepare user mentions
           mentions = ""
-          notify_users = "${{ inputs.notify-users }}"
-          if notify_users:
-              for user in notify_users.split(','):
-                  clean_user = user.strip()
-                  if clean_user and clean_user in email_map:
-                      mentions += f"<at>{email_map[clean_user]}</at> "
-                  elif clean_user:
-                      mentions += f"@{clean_user} "
+          notify_user = os.environ.get('NOTIFY_USER', '')
+          if notify_user and notify_user in email_map:
+              mentions = f"<at>{email_map[notify_user]}</at>"
+          elif notify_user:
+              mentions = f"@{notify_user}"
           
           # Load the JSON
           with open('teams-payload.json', 'r') as f:
@@ -514,12 +523,9 @@ jobs:
           
           # Prepare user mentions
           mentions = ""
-          notify_users = "${{ inputs.notify-users }}"
-          if notify_users:
-              for user in notify_users.split(','):
-                  clean_user = user.strip()
-                  if clean_user and clean_user in email_map:
-                      mentions += f"<at>{email_map[clean_user]}</at> "
+          notify_user = os.environ.get('NOTIFY_USER', '')
+          if notify_user and notify_user in email_map:
+              mentions = f"<at>{email_map[notify_user]}</at>"
           
           # Load the JSON
           with open('teams-payload.json', 'r') as f:
