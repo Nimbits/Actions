@@ -44,6 +44,12 @@ jobs:
                -o .github/lint-configs/package.json \
                "https://api.github.com/repos/Nimbits/cli/contents/package.json?ref=${{ inputs.cli-branch }}"
           
+          # Download pnpm-lock.yaml from CLI repo
+          curl -H "Authorization: token ${{ secrets.DEPENDENCY_TOKEN }}" \
+               -H "Accept: application/vnd.github.v3.raw" \
+               -o .github/lint-configs/pnpm-lock.yaml \
+               "https://api.github.com/repos/Nimbits/cli/contents/pnpm-lock.yaml?ref=${{ inputs.cli-branch }}"
+          
           # Download PHPStan config
           curl -H "Authorization: token ${{ secrets.DEPENDENCY_TOKEN }}" \
                -H "Accept: application/vnd.github.v3.raw" \
@@ -126,15 +132,25 @@ jobs:
           echo "📦 Installing Node.js dependencies from CLI package.json..."
           cd .github/lint-configs
           
+          # Show what files we have
+          echo "Downloaded files:"
+          ls -la
+          
           # Show package.json content for verification
           echo "CLI package.json content:"
           cat package.json
           
-          # Install using pnpm (same as CLI)
-          pnpm install --frozen-lockfile
+          # Check if pnpm-lock.yaml was downloaded
+          if [ -f "pnpm-lock.yaml" ]; then
+            echo "✅ pnpm-lock.yaml found, using frozen lockfile"
+            pnpm install --frozen-lockfile
+          else
+            echo "⚠️ pnpm-lock.yaml not found, installing without frozen lockfile"
+            pnpm install --no-frozen-lockfile
+          fi
           
           echo "✅ Installed linting dependencies:"
-          ls -la node_modules/.bin/ | grep -E "(eslint|stylelint)"
+          ls -la node_modules/.bin/ | grep -E "(eslint|stylelint)" || echo "No linting tools found in bin"
           
           cd ../..
 
