@@ -6,11 +6,11 @@ on:
         description: 'PHPStan analysis level'
         required: false
         default: '5'
-        type: 'string'
+        type: string
       php-version:
         description: 'PHP version for PHPStan'
         required: false
-        default: "8.2"
+        default: '8.2'
         type: string
       cli-branch:
         description: 'CLI branch to use for configs'
@@ -299,81 +299,6 @@ jobs:
             echo "OVERALL_FAILED=false" >> $GITHUB_ENV
           fi
 
-      - name: Prepare Teams notification message
-        if: always()
-        run: |
-          # Parse user mapping from organization variable
-          # Expected format: "github_user1:email1@domain.com,github_user2:email2@domain.com"
-          declare -A EMAIL_MAP=()
-          
-          if [ -n "${{ vars.TEAMS_USER_MAPPING }}" ]; then
-            echo "📧 Loading user email mapping from organization variable..."
-            IFS=',' read -ra USER_PAIRS <<< "${{ vars.TEAMS_USER_MAPPING }}"
-            for pair in "${USER_PAIRS[@]}"; do
-              # Split by colon and clean whitespace
-              IFS=':' read -ra MAPPING <<< "$pair"
-              if [ ${#MAPPING[@]} -eq 2 ]; then
-                github_user=$(echo "${MAPPING[0]}" | xargs)
-                email=$(echo "${MAPPING[1]}" | xargs)
-                EMAIL_MAP["$github_user"]="$email"
-                echo "  $github_user -> $email"
-              fi
-            done
-          else
-            echo "⚠️ No TEAMS_USER_MAPPING variable found in organization settings"
-          fi
-          
-          # Prepare user mentions
-          MENTIONS=""
-          if [ -n "${{ inputs.notify-users }}" ]; then
-            IFS=',' read -ra USERS <<< "${{ inputs.notify-users }}"
-            for user in "${USERS[@]}"; do
-              # Clean whitespace
-              clean_user=$(echo "$user" | xargs)
-              if [ -n "$clean_user" ]; then
-                # Use mapped email if available, otherwise use GitHub username
-                if [ -n "${EMAIL_MAP[$clean_user]}" ]; then
-                  MENTIONS="$MENTIONS <at>${EMAIL_MAP[$clean_user]}</at>"
-                  echo "✅ Mapping $clean_user to ${EMAIL_MAP[$clean_user]}"
-                else
-                  # Fallback to GitHub username if no mapping found
-                  MENTIONS="$MENTIONS @$clean_user"
-                  echo "⚠️ No email mapping found for $clean_user, using GitHub username"
-                fi
-              fi
-            done
-          fi
-          
-          # Determine message color and status
-          if [ "${{ env.OVERALL_FAILED }}" = "true" ]; then
-            COLOR="F85149"  # Red
-            STATUS="FAILED ❌"
-            SUMMARY="Pipeline failed with the following issues:${{ env.FAILED_DETAILS }}"
-          else
-            COLOR="28A745"  # Green  
-            STATUS="PASSED ✅"
-            SUMMARY="All tests passed successfully!"
-          fi
-          
-          # Create message
-          MESSAGE="**Shopware Plugin Test Results**\n\n"
-          MESSAGE="${MESSAGE}**Repository:** ${{ github.repository }}\n"
-          MESSAGE="${MESSAGE}**Branch:** ${{ github.ref_name }}\n"
-          MESSAGE="${MESSAGE}**Commit:** [\`$(echo '${{ github.sha }}' | cut -c1-7)\`](${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }})\n"
-          MESSAGE="${MESSAGE}**Workflow:** [Run #${{ github.run_number }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})\n\n"
-          MESSAGE="${MESSAGE}**Status:** $STATUS\n\n"
-          MESSAGE="${MESSAGE}$SUMMARY"
-          
-          if [ -n "$MENTIONS" ]; then
-            MESSAGE="${MESSAGE}\n\n$MENTIONS"
-          fi
-          
-          # Save for Teams step
-          echo "TEAMS_COLOR=$COLOR" >> $GITHUB_ENV
-          echo "TEAMS_MESSAGE<<EOF" >> $GITHUB_ENV
-          echo -e "$MESSAGE" >> $GITHUB_ENV
-          echo "EOF" >> $GITHUB_ENV
-
       - name: Fetch secrets from Vault for testing
         id: fetch_secrets
         if: always()
@@ -391,8 +316,13 @@ jobs:
           # Get short SHA
           SHORT_SHA=$(echo '${{ github.sha }}' | cut -c1-7)
           
-          # Export the user mapping to environment variable for Python
+          # Export environment variables for Python
           export TEAMS_USER_MAPPING="${{ vars.TEAMS_USER_MAPPING }}"
+          export COMPOSER_CHECK_FAILED="${{ env.COMPOSER_CHECK_FAILED }}"
+          export README_CHECK_FAILED="${{ env.README_CHECK_FAILED }}"
+          export PHPSTAN_FAILED="${{ env.PHPSTAN_FAILED }}"
+          export ESLINT_FAILED="${{ env.ESLINT_FAILED }}"
+          export STYLELINT_FAILED="${{ env.STYLELINT_FAILED }}"
           
           # Determine the author to notify
           if [ "${{ github.event_name }}" = "pull_request" ]; then
@@ -406,56 +336,8 @@ jobs:
           echo "📧 Will notify author: $AUTHOR_USERNAME"
           export NOTIFY_USER="$AUTHOR_USERNAME"
           
-          # Create custom Teams webhook payload
-          cat > teams-payload.json << EOF
-          {
-            "@type": "MessageCard",
-            "@context": "http://schema.org/extensions",
-            "themeColor": "${{ env.TEAMS_COLOR }}",
-            "summary": "Pipeline ${{ env.OVERALL_FAILED == 'true' && 'Failed' || 'Passed' }}",
-            "sections": [{
-              "activityTitle": "Shopware Plugin Test Results",
-              "activitySubtitle": "${{ github.repository }}",
-              "activityImage": "https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png",
-              "facts": [
-                {
-                  "name": "Repository:",
-                  "value": "${{ github.repository }}"
-                },
-                {
-                  "name": "Branch:",
-                  "value": "${{ github.ref_name }}"
-                },
-                {
-                  "name": "Commit:",
-                  "value": "[\`${SHORT_SHA}\`](${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }})"
-                },
-                {
-                  "name": "Workflow:",
-                  "value": "[Run #${{ github.run_number }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})"
-                },
-                {
-                  "name": "Status:",
-                  "value": "${{ env.OVERALL_FAILED == 'true' && 'FAILED ❌' || 'PASSED ✅' }}"
-                }
-              ],
-              "markdown": true
-            }],
-            "potentialAction": [{
-              "@type": "OpenUri",
-              "name": "View Workflow Run",
-              "targets": [{
-                "os": "default",
-                "uri": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-              }]
-            }]
-          }
-          EOF
-          
-          # Add custom text section with proper line breaks and user mentions
-          if [ "${{ env.OVERALL_FAILED }}" = "true" ]; then
-            # Create failed message with details and mentions
-            python3 << 'PYTHON_EOF'
+          # Create Teams notification with Python
+          python3 << 'PYTHON_EOF'
           import json
           import os
           
@@ -468,22 +350,13 @@ jobs:
                       github_user, email = pair.split(':', 1)
                       email_map[github_user.strip()] = email.strip()
           
-          # Prepare user mentions
-          mentions = ""
+          # Get the user to notify
           notify_user = os.environ.get('NOTIFY_USER', '')
-          if notify_user and notify_user in email_map:
-              mentions = f"<at>{email_map[notify_user]}</at>"
-          elif notify_user:
-              mentions = f"@{notify_user}"
+          user_email = email_map.get(notify_user, '')
           
-          # Load the JSON
-          with open('teams-payload.json', 'r') as f:
-              payload = json.load(f)
-          
-          # Create detailed test results
+          # Create test results text
           test_results = []
           
-          # Check each test status from environment
           if os.environ.get('COMPOSER_CHECK_FAILED', 'false') == 'true':
               test_results.append("❌ **Composer Version Check**: Failed - Please update composer version")
           else:
@@ -509,86 +382,98 @@ jobs:
           else:
               test_results.append("✅ **Stylelint**: Passed")
           
-          results_text = "<br>".join(test_results)
+          # Determine overall status
+          if "${{ env.OVERALL_FAILED }}" == "true":
+              overall_result = "🔴 **Overall Result**: FAILED"
+              action_text = "Please fix the above issues and try again."
+              color = "F85149"  # Red
+              summary = "Pipeline Failed ❌"
+          else:
+              overall_result = "🟢 **Overall Result**: ALL TESTS PASSED"
+              action_text = "Great job! All linting and validation checks passed successfully."
+              color = "28A745"  # Green
+              summary = "Pipeline Passed ✅"
           
-          text_content = f"""<br>{results_text}<br><br>🔴 **Overall Result**: FAILED<br><br>Please fix the above issues and try again.<br><br>{mentions}"""
+          # Build the message text with mentions
+          message_parts = test_results + ["", overall_result, "", action_text]
           
-            }
-          ],
-          "entities": [{
-            "type": "mention",
-            "text": mentions,
-            "mentioned": {
-              "id": email_map.get(notify_user, ''),
-              "name": notify_user
-            }
-          }] if mentions and notify_user in email_map else []
-      }
-
-        # Add sections with entities
-        payload['sections'].append(text_section)
-
-        # Save updated JSON
-        with open('teams-payload.json', 'w') as f:
-          json.dump(payload, f, indent=2)
-        PYTHON_EOF
-        
-        else
-        # Create success message
-        python3 << 'PYTHON_EOF'
-        import json
-        import os
-        
-        # Parse user mapping
-        email_map = {}
-        user_mapping = os.environ.get('TEAMS_USER_MAPPING', '')
-        if user_mapping:
-          for pair in user_mapping.split(','):
-            if ':' in pair:
-              github_user, email = pair.split(':', 1)
-              email_map[github_user.strip()] = email.strip()
-
-        # Prepare user mentions
-        mentions = ""
-        notify_user = os.environ.get('NOTIFY_USER', '')
-        if notify_user and notify_user in email_map:
-          mentions = f"<at>{email_map[notify_user]}</at>"
-
-        # Load the JSON
-        with open('teams-payload.json', 'r') as f:
-          payload = json.load(f)
-
-        # Create success message with all test results
-        test_results = []
-        test_results.append("✅ **Composer Version Check**: Passed")
-        test_results.append("✅ **README Check**: Passed")
-        test_results.append("✅ **PHPStan**: Passed")
-        test_results.append("✅ **ESLint**: Passed")
-        test_results.append("✅ **Stylelint**: Passed")
-
-        results_text = "<br>".join(test_results)
-
-        text_content = f"""<br>{results_text}<br><br>🟢 **Overall Result**: ALL TESTS PASSED<br><br>Great job! All linting and validation checks passed successfully.<br><br>{mentions}"""
-
-        # Add text section
-        payload['sections'][0]['text'] = text_content
-
-        # Save updated JSON
-        with open('teams-payload.json', 'w') as f:
-          json.dump(payload, f, indent=2)
-        PYTHON_EOF
-        
-        fi
-        
-        # Debug: Show final payload
-        echo "=== Final Teams Payload ==="
-        cat teams-payload.json
-        
-        # Send to Teams webhook
-        curl -X POST \
-        -H "Content-Type: application/json" \
-        -d @teams-payload.json \
-        "${{ env.MS_TEAMS_WEBHOOK_URI }}"
+          # Add mention if we have email mapping
+          if notify_user and user_email:
+              message_parts.append("")
+              message_parts.append(f"<at>{notify_user}</at>")
+          
+          message_text = "<br>".join(message_parts)
+          
+          # Create Teams adaptive card payload
+          payload = {
+              "@type": "MessageCard",
+              "@context": "http://schema.org/extensions",
+              "themeColor": color,
+              "summary": summary,
+              "sections": [{
+                  "activityTitle": "Shopware Plugin Test Results",
+                  "activitySubtitle": "${{ github.repository }}",
+                  "activityImage": "https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png",
+                  "facts": [
+                      {
+                          "name": "Repository:",
+                          "value": "${{ github.repository }}"
+                      },
+                      {
+                          "name": "Branch:",
+                          "value": "${{ github.ref_name }}"
+                      },
+                      {
+                          "name": "Commit:",
+                          "value": "[`${{ github.sha }}`](${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }})".replace("${{ github.sha }}", "${{ github.sha }}"[:7])
+                      },
+                      {
+                          "name": "Workflow:",
+                          "value": "[Run #${{ github.run_number }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})"
+                      }
+                  ],
+                  "markdown": True,
+                  "text": message_text
+              }],
+              "potentialAction": [{
+                  "@type": "OpenUri",
+                  "name": "View Workflow Run",
+                  "targets": [{
+                      "os": "default",
+                      "uri": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+                  }]
+              }]
+          }
+          
+          # Add entities for mentions if we have email
+          if notify_user and user_email:
+              if "entities" not in payload:
+                  payload["entities"] = []
+              payload["entities"].append({
+                  "type": "mention",
+                  "text": f"<at>{notify_user}</at>",
+                  "mentioned": {
+                      "id": user_email,
+                      "name": notify_user
+                  }
+              })
+          
+          # Save JSON payload
+          with open('teams-payload.json', 'w') as f:
+              json.dump(payload, f, indent=2)
+          
+          print(f"Created Teams notification - will mention: {notify_user} ({user_email})" if user_email else f"No email mapping for {notify_user}")
+          PYTHON_EOF
+          
+          # Debug: Show final payload
+          echo "=== Final Teams Payload ==="
+          cat teams-payload.json
+          
+          # Send to Teams webhook
+          curl -X POST \
+            -H "Content-Type: application/json" \
+            -d @teams-payload.json \
+            "${{ env.MS_TEAMS_WEBHOOK_URI }}"
 
       - name: Fail job if any tests failed
         if: env.OVERALL_FAILED == 'true'
