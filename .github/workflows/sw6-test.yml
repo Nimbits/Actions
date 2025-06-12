@@ -94,7 +94,20 @@ jobs:
       - name: Install CLI linting dependencies
         run: |
           cd .github/nimbits-cli
+          
+          # Install Node.js dependencies
           pnpm install --frozen-lockfile
+          
+          # Install PHP dependencies (PHPStan)
+          if [ -f "composer.json" ]; then
+            composer install --no-dev --no-interaction
+          fi
+          
+          # Verify installations
+          echo "=== Verifying CLI tools ==="
+          ls -la vendor/bin/ || echo "No vendor/bin directory"
+          ls -la node_modules/.bin/ || echo "No node_modules/.bin directory"
+          
           cd ../..
 
       - name: Run CLI linting
@@ -102,6 +115,9 @@ jobs:
           # Set CLI path
           CLI_PATH="$(pwd)/.github/nimbits-cli/nb.sh"
           chmod +x "$CLI_PATH"
+          
+          # Export CLI directory for the script
+          export SCRIPT_DIR="$(pwd)/.github/nimbits-cli"
           
           # Run PHPStan
           echo "Running PHPStan analysis..."
