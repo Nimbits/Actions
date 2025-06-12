@@ -366,64 +366,62 @@ jobs:
           
           print(f"Debug: notify_user={notify_user}, user_email={user_email}, display_name={user_display_name}")
           
-          # Create test results text with actual newlines
-          test_results = []
+          # Create test results as individual lines
+          message_parts = []
           
           if os.environ.get('COMPOSER_CHECK_FAILED', 'false') == 'true':
-              test_results.append("❌ **Composer Version Check**: Failed - Please update composer version")
+              message_parts.append("❌ **Composer Version Check**: Failed - Please update composer version")
           else:
-              test_results.append("✅ **Composer Version Check**: Passed")
+              message_parts.append("✅ **Composer Version Check**: Passed")
           
           if os.environ.get('README_CHECK_FAILED', 'false') == 'true':
-              test_results.append("❌ **README Check**: Failed - Please update README with version info")
+              message_parts.append("❌ **README Check**: Failed - Please update README with version info")
           else:
-              test_results.append("✅ **README Check**: Passed")
+              message_parts.append("✅ **README Check**: Passed")
           
           if os.environ.get('PHPSTAN_FAILED', 'false') == 'true':
-              test_results.append("❌ **PHPStan**: Failed - PHP static analysis errors found")
+              message_parts.append("❌ **PHPStan**: Failed - PHP static analysis errors found")
           else:
-              test_results.append("✅ **PHPStan**: Passed")
+              message_parts.append("✅ **PHPStan**: Passed")
           
           if os.environ.get('ESLINT_FAILED', 'false') == 'true':
-              test_results.append("❌ **ESLint**: Failed - JavaScript/Vue linting errors found")
+              message_parts.append("❌ **ESLint**: Failed - JavaScript/Vue linting errors found")
           else:
-              test_results.append("✅ **ESLint**: Passed")
+              message_parts.append("✅ **ESLint**: Passed")
           
           if os.environ.get('STYLELINT_FAILED', 'false') == 'true':
-              test_results.append("❌ **Stylelint**: Failed - CSS/SCSS linting errors found")
+              message_parts.append("❌ **Stylelint**: Failed - CSS/SCSS linting errors found")
           else:
-              test_results.append("✅ **Stylelint**: Passed")
+              message_parts.append("✅ **Stylelint**: Passed")
+          
+          # Add empty line before overall result
+          message_parts.append("")
           
           # Determine overall status
           if os.environ.get('OVERALL_FAILED', 'false') == 'true':
-              overall_result = "🔴 **Overall Result**: FAILED"
-              action_text = "Please fix the above issues and try again."
+              message_parts.append("🔴 **Overall Result**: FAILED")
+              message_parts.append("")
+              message_parts.append("Please fix the above issues and try again.")
               color = "F85149"  # Red
               summary = "Pipeline Failed ❌"
           else:
-              overall_result = "🟢 **Overall Result**: ALL TESTS PASSED"
-              action_text = "Great job! All linting and validation checks passed successfully."
+              message_parts.append("🟢 **Overall Result**: ALL TESTS PASSED")
+              message_parts.append("")
+              message_parts.append("Great job! All linting and validation checks passed successfully.")
               color = "28A745"  # Green
               summary = "Pipeline Passed ✅"
           
-          # Get short SHA
-          github_sha = "${{ github.sha }}"
-          short_sha = github_sha[:7]
-          
-          # Build the message text with actual newlines (not escaped)
-          message_parts = test_results.copy()
-          message_parts.append("")  # Empty line
-          message_parts.append(overall_result)
-          message_parts.append("")  # Empty line
-          message_parts.append(action_text)
-          
           # Add mention if we have a mapping
           if notify_user and user_email and user_display_name:
-              message_parts.append("")  # Empty line
+              message_parts.append("")
               message_parts.append(f"<at>{user_display_name}</at>")
           
           # Join with actual newlines
           message_text = "\n".join(message_parts)
+          
+          # Get short SHA
+          github_sha = "${{ github.sha }}"
+          short_sha = github_sha[:7]
           
           # Create Adaptive Card payload (required for mentions in webhooks)
           payload = {
@@ -517,6 +515,7 @@ jobs:
             -H "Content-Type: application/json" \
             -d @teams-payload.json \
             "${{ env.MS_TEAMS_WEBHOOK_URI }}"
+
 
       - name: Fail job if any tests failed
         if: env.OVERALL_FAILED == 'true'
