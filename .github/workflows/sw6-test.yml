@@ -313,9 +313,6 @@ jobs:
       - name: Send Teams notification with custom content
         if: always()
         run: |
-          # Get short SHA
-          SHORT_SHA=$(echo '${{ github.sha }}' | cut -c1-7)
-          
           # Export environment variables for Python
           export TEAMS_USER_MAPPING="${{ vars.TEAMS_USER_MAPPING }}"
           export COMPOSER_CHECK_FAILED="${{ env.COMPOSER_CHECK_FAILED }}"
@@ -323,6 +320,7 @@ jobs:
           export PHPSTAN_FAILED="${{ env.PHPSTAN_FAILED }}"
           export ESLINT_FAILED="${{ env.ESLINT_FAILED }}"
           export STYLELINT_FAILED="${{ env.STYLELINT_FAILED }}"
+          export OVERALL_FAILED="${{ env.OVERALL_FAILED }}"
           
           # Determine the author to notify
           if [ "${{ github.event_name }}" = "pull_request" ]; then
@@ -342,17 +340,31 @@ jobs:
           import os
           
           # Parse user mapping from organization variable
+          # Expected format: "github_user1:email1:displayname1,github_user2:email2:displayname2"
           email_map = {}
+          display_name_map = {}
           user_mapping = os.environ.get('TEAMS_USER_MAPPING', '')
           if user_mapping:
-              for pair in user_mapping.split(','):
-                  if ':' in pair:
-                      github_user, email = pair.split(':', 1)
-                      email_map[github_user.strip()] = email.strip()
+              for entry in user_mapping.split(','):
+                  parts = entry.split(':')
+                  if len(parts) == 3:
+                      github_user, email, display_name = [p.strip() for p in parts]
+                      email_map[github_user] = email
+                      display_name_map[github_user] = display_name
+                      print(f"Mapped: {github_user} -> {email} ({display_name})")
+                  elif len(parts) == 2:
+                      # Backwards compatibility: github_user:email
+                      github_user, email = [p.strip() for p in parts]
+                      email_map[github_user] = email
+                      display_name_map[github_user] = email.split('@')[0].replace('.', ' ').title()
+                      print(f"Mapped (legacy): {github_user} -> {email}")
           
           # Get the user to notify
           notify_user = os.environ.get('NOTIFY_USER', '')
           user_email = email_map.get(notify_user, '')
+          user_display_name = display_name_map.get(notify_user, '')
+          
+          print(f"Debug: notify_user={notify_user}, user_email={user_email}, display_name={user_display_name}")
           
           # Create test results text
           test_results = []
@@ -383,7 +395,7 @@ jobs:
               test_results.append("✅ **Stylelint**: Passed")
           
           # Determine overall status
-          if "${{ env.OVERALL_FAILED }}" == "true":
+          if os.environ.get('OVERALL_FAILED', 'false') == 'true':
               overall_result = "🔴 **Overall Result**: FAILED"
               action_text = "Please fix the above issues and try again."
               color = "F85149"  # Red
@@ -394,15 +406,12 @@ jobs:
               color = "28A745"  # Green
               summary = "Pipeline Passed ✅"
           
-          # Build the message text with mentions
+          # Get short SHA
+          github_sha = "${{ github.sha }}"
+          short_sha = github_sha[:7]
+          
+          # Build the message text
           message_parts = test_results + ["", overall_result, "", action_text]
-          
-          # Add mention if we have email mapping
-          if notify_user and user_email:
-              message_parts.append("")
-              message_parts.append(f"<at>{notify_user}</at>")
-          
-          message_text = "<br>".join(message_parts)
           
           # Create Teams adaptive card payload
           payload = {
@@ -425,44 +434,51 @@ jobs:
                       },
                       {
                           "name": "Commit:",
-                          "value": "[`${{ github.sha }}`](${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }})".replace("${{ github.sha }}", "${{ github.sha }}"[:7])
+                          "value": f"[`{short_sha}`](${{ github.server_url }}/${{ github.repository }}/commit/{github_sha})"
                       },
                       {
                           "name": "Workflow:",
                           "value": "[Run #${{ github.run_number }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})"
                       }
                   ],
-                  "markdown": True,
-                  "text": message_text
-              }],
-              "potentialAction": [{
-                  "@type": "OpenUri",
-                  "name": "View Workflow Run",
-                  "targets": [{
-                      "os": "default",
-                      "uri": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-                  }]
+                  "markdown": True
               }]
           }
           
-          # Add entities for mentions if we have email
-          if notify_user and user_email:
-              if "entities" not in payload:
-                  payload["entities"] = []
-              payload["entities"].append({
+          # Add mention to the text if we have email mapping
+          if notify_user and user_email and user_display_name:
+              message_parts.append("")
+              message_parts.append(f"<at>{user_display_name}</at>")
+          
+              # Add the mention entity
+              payload["entities"] = [{
                   "type": "mention",
-                  "text": f"<at>{notify_user}</at>",
+                  "text": f"<at>{user_display_name}</at>",
                   "mentioned": {
                       "id": user_email,
-                      "name": notify_user
+                      "name": user_display_name
                   }
-              })
+              }]
+          
+          # Join all message parts and add to payload
+          message_text = "<br>".join(message_parts)
+          payload["sections"][0]["text"] = message_text
+          
+          # Add action button
+          payload["potentialAction"] = [{
+              "@type": "OpenUri",
+              "name": "View Workflow Run",
+              "targets": [{
+                  "os": "default",
+                  "uri": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+              }]
+          }]
           
           # Save JSON payload
           with open('teams-payload.json', 'w') as f:
               json.dump(payload, f, indent=2)
           
-          print(f"Created Teams notification - will mention: {notify_user} ({user_email})" if user_email else f"No email mapping for {notify_user}")
+          print(f"Created Teams notification - will mention: {notify_user} ({user_email}) as '{user_display_name}'" if user_email else f"No mapping found for {notify_user}")
           PYTHON_EOF
           
           # Debug: Show final payload
