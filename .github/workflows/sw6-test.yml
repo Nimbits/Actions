@@ -396,6 +396,9 @@ jobs:
           # Get short SHA
           SHORT_SHA=$(echo '${{ github.sha }}' | cut -c1-7)
           
+          # Export the user mapping to environment variable for Python
+          export TEAMS_USER_MAPPING="${{ vars.TEAMS_USER_MAPPING }}"
+          
           # Create custom Teams webhook payload
           cat > teams-payload.json << EOF
           {
@@ -451,7 +454,7 @@ jobs:
           
           # Parse user mapping from organization variable
           email_map = {}
-          user_mapping = os.environ.get('${{ vars.TEAMS_USER_MAPPING }}', '')
+          user_mapping = os.environ.get('TEAMS_USER_MAPPING', '')
           if user_mapping:
               for pair in user_mapping.split(','):
                   if ':' in pair:
@@ -502,7 +505,7 @@ jobs:
           
           # Parse user mapping
           email_map = {}
-          user_mapping = os.environ.get('${{ vars.TEAMS_USER_MAPPING }}', '')
+          user_mapping = os.environ.get('TEAMS_USER_MAPPING', '')
           if user_mapping:
               for pair in user_mapping.split(','):
                   if ':' in pair:
