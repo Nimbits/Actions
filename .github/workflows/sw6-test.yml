@@ -390,16 +390,61 @@ jobs:
           secrets: |
             deployment/data/store/sw6 ms_teams_webhook_uri | MS_TEAMS_WEBHOOK_URI
 
-      - name: Notify teams with detailed results
+      - name: Send Teams notification with custom content
         if: always()
-        uses: jdcargile/ms-teams-notification@v1.4
-        with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          ms-teams-webhook-uri: ${{ env.MS_TEAMS_WEBHOOK_URI }}
-          notification-summary: 'Pipeline ${{ env.OVERALL_FAILED == ''true'' && ''Failed'' || ''Passed'' }}'
-          notification-color: ${{ env.TEAMS_COLOR }}
-          notification-message: ${{ env.TEAMS_MESSAGE }}
-          timezone: Europe/Berlin
+        run: |
+          # Create custom Teams webhook payload
+          cat > teams-payload.json << EOF
+          {
+            "@type": "MessageCard",
+            "@context": "http://schema.org/extensions",
+            "themeColor": "${{ env.TEAMS_COLOR }}",
+            "summary": "Pipeline ${{ env.OVERALL_FAILED == 'true' && 'Failed' || 'Passed' }}",
+            "sections": [{
+              "activityTitle": "**Shopware Plugin Test Results**",
+              "activitySubtitle": "${{ github.repository }}",
+              "activityImage": "https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png",
+              "facts": [
+                {
+                  "name": "Repository:",
+                  "value": "${{ github.repository }}"
+                },
+                {
+                  "name": "Branch:",
+                  "value": "${{ github.ref_name }}"
+                },
+                {
+                  "name": "Commit:",
+                  "value": "[\`$(echo '${{ github.sha }}' | cut -c1-7)\`](${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }})"
+                },
+                {
+                  "name": "Workflow:",
+                  "value": "[Run #${{ github.run_number }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})"
+                },
+                {
+                  "name": "Status:",
+                  "value": "${{ env.OVERALL_FAILED == 'true' && 'FAILED ❌' || 'PASSED ✅' }}"
+                }
+              ],
+              "markdown": true,
+              "text": "${{ env.TEAMS_MESSAGE }}"
+            }],
+            "potentialAction": [{
+              "@type": "OpenUri",
+              "name": "View Workflow Run",
+              "targets": [{
+                "os": "default",
+                "uri": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+              }]
+            }]
+          }
+          EOF
+          
+          # Send to Teams webhook
+          curl -X POST \
+            -H "Content-Type: application/json" \
+            -d @teams-payload.json \
+            "${{ env.MS_TEAMS_WEBHOOK_URI }}"
 
       - name: Fail job if any tests failed
         if: env.OVERALL_FAILED == 'true'
