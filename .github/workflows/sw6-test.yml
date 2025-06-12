@@ -411,67 +411,95 @@ jobs:
           short_sha = github_sha[:7]
           
           # Build the message text
-          message_parts = test_results + ["", overall_result, "", action_text]
+          message_parts = []
+          message_parts.append("\\n".join(test_results))
+          message_parts.append("\\n")
+          message_parts.append(overall_result)
+          message_parts.append("\\n")
+          message_parts.append(action_text)
           
-          # Add mention to the text if we have email mapping
+          # Add mention if we have a mapping
           if notify_user and user_email and user_display_name:
-              message_parts.append("")
+              message_parts.append("\\n\\n")
               message_parts.append(f"<at>{user_display_name}</at>")
           
-          # Join all message parts
-          message_text = "<br>".join(message_parts)
+          message_text = "".join(message_parts)
           
-          # Create Teams adaptive card payload with proper mention format
+          # Create Adaptive Card payload (required for mentions in webhooks)
           payload = {
-              "@type": "MessageCard",
-              "@context": "http://schema.org/extensions",
-              "themeColor": color,
-              "summary": summary,
-              "sections": [{
-                  "activityTitle": "Shopware Plugin Test Results",
-                  "activitySubtitle": "${{ github.repository }}",
-                  "activityImage": "https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png",
-                  "facts": [
-                      {
-                          "name": "Repository:",
-                          "value": "${{ github.repository }}"
-                      },
-                      {
-                          "name": "Branch:",
-                          "value": "${{ github.ref_name }}"
-                      },
-                      {
-                          "name": "Commit:",
-                          "value": f"[`{short_sha}`](${{ github.server_url }}/${{ github.repository }}/commit/{github_sha})"
-                      },
-                      {
-                          "name": "Workflow:",
-                          "value": "[Run #${{ github.run_number }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})"
+              "type": "message",
+              "attachments": [
+                  {
+                      "contentType": "application/vnd.microsoft.card.adaptive",
+                      "content": {
+                          "type": "AdaptiveCard",
+                          "$schema": "http://adaptivecards.io/schemas/adaptive-card.json",
+                          "version": "1.3",
+                          "body": [
+                              {
+                                  "type": "TextBlock",
+                                  "text": "Shopware Plugin Test Results",
+                                  "weight": "Bolder",
+                                  "size": "Large"
+                              },
+                              {
+                                  "type": "TextBlock",
+                                  "text": "${{ github.repository }}",
+                                  "spacing": "None",
+                                  "isSubtle": True
+                              },
+                              {
+                                  "type": "FactSet",
+                                  "facts": [
+                                      {
+                                          "title": "Branch:",
+                                          "value": "${{ github.ref_name }}"
+                                      },
+                                      {
+                                          "title": "Commit:",
+                                          "value": f"[{short_sha}](${{ github.server_url }}/${{ github.repository }}/commit/{github_sha})"
+                                      },
+                                      {
+                                          "title": "Workflow:",
+                                          "value": "[Run #${{ github.run_number }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})"
+                                      }
+                                  ],
+                                  "separator": True
+                              },
+                              {
+                                  "type": "TextBlock",
+                                  "text": message_text,
+                                  "wrap": True,
+                                  "separator": True
+                              }
+                          ],
+                          "actions": [
+                              {
+                                  "type": "Action.OpenUrl",
+                                  "title": "View Workflow Run",
+                                  "url": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+                              }
+                          ],
+                          "msteams": {
+                              "width": "Full"
+                          }
                       }
-                  ],
-                  "markdown": True,
-                  "text": message_text
-              }],
-              "potentialAction": [{
-                  "@type": "OpenUri",
-                  "name": "View Workflow Run",
-                  "targets": [{
-                      "os": "default",
-                      "uri": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-                  }]
-              }]
+                  }
+              ]
           }
           
-          # Add entities at section level if we have a mention
+          # Add msteams entities for mention if we have email mapping
           if notify_user and user_email and user_display_name:
-              payload["sections"][0]["entities"] = [{
-                  "type": "mention",
-                  "text": f"<at>{user_display_name}</at>",
-                  "mentioned": {
-                      "id": user_email,
-                      "name": user_display_name
+              payload["attachments"][0]["content"]["msteams"]["entities"] = [
+                  {
+                      "type": "mention",
+                      "text": f"<at>{user_display_name}</at>",
+                      "mentioned": {
+                          "id": user_email,
+                          "name": user_display_name
+                      }
                   }
-              }]
+              ]
           
           # Save JSON payload
           with open('teams-payload.json', 'w') as f:
