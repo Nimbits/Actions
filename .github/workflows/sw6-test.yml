@@ -1,5 +1,4 @@
 name: 'Shopware 6 Plugin Test'
-
 on:
   workflow_call:
     inputs:
@@ -9,9 +8,14 @@ on:
         default: '5'
         type: 'string'
       php-version:
-        description: 'PHP version for PHPStan'
+        description: 'PHP version for linting'
         required: false
         default: "8.2"
+        type: string
+      cli-branch:
+        description: 'CLI branch to use'
+        required: false
+        default: 'linters'
         type: string
     secrets:
       CURR_VAULT_PATH:
@@ -24,10 +28,18 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4.1.1
+
+      - name: Checkout CLI tools
+        uses: actions/checkout@v4.1.1
+        with:
+          repository: 'Nimbits/cli'
+          ref: ${{ inputs.cli-branch }}
+          path: '.github/nimbits-cli'
+          token: ${{ secrets.DEPENDENCY_TOKEN }}
 
       - name: Determine Base Branch
         id: basebranch
@@ -37,7 +49,7 @@ jobs:
           else
             echo "branch=$(git ls-remote --heads origin master | grep -q master && echo master || (git ls-remote --heads origin main | grep -q main && echo main))" >> $GITHUB_ENV
           fi
-  
+
       - name: Check composer version
         if: github.event_name != 'release'
         run: |
@@ -51,7 +63,6 @@ jobs:
             exit 1
           fi
 
-      
       - name: Check for README changes
         if: github.event_name != 'release'
         run: |
@@ -61,8 +72,7 @@ jobs:
             exit 1
           fi
 
-
-      - name: Configure GitHub token #needed for vcs dependencies
+      - name: Configure GitHub token
         run: composer config --global --auth github-oauth.github.com ${{ secrets.DEPENDENCY_TOKEN }}
 
       - name: Setup PHP
@@ -70,17 +80,40 @@ jobs:
         with:
           php-version: ${{ inputs.php-version }}
 
-      - name: Install dependencies
-        run: |
-          composer install
-
-      - name: PHPStan
-        uses: php-actions/phpstan@v3
+      - name: Setup Node.js and pnpm
+        uses: actions/setup-node@v4
         with:
-          version: composer
-          path: src/
-          level: ${{ inputs.phpstan-level }}
-          php_version: ${{ inputs.php-version }}
+          node-version: '20'
+
+      - name: Install pnpm
+        run: npm install -g pnpm
+
+      - name: Install PHP dependencies
+        run: composer install
+
+      - name: Install CLI linting dependencies
+        run: |
+          cd .github/nimbits-cli
+          pnpm install --frozen-lockfile
+          cd ../..
+
+      - name: Run CLI linting
+        run: |
+          # Set CLI path
+          CLI_PATH="$(pwd)/.github/nimbits-cli/nb.sh"
+          chmod +x "$CLI_PATH"
+          
+          # Run PHPStan
+          echo "Running PHPStan analysis..."
+          "$CLI_PATH" lint:php ${{ inputs.phpstan-level }}
+          
+          # Run ESLint
+          echo "Running ESLint analysis..."
+          "$CLI_PATH" lint:js || echo "ESLint completed with issues"
+          
+          # Run Stylelint
+          echo "Running Stylelint analysis..."
+          "$CLI_PATH" lint:css || echo "Stylelint completed with issues"
 
       - name: Fetch secrets from Vault for testing
         id: fetch_secrets
@@ -99,6 +132,6 @@ jobs:
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           ms-teams-webhook-uri: ${{ env.MS_TEAMS_WEBHOOK_URI }}
-          notification-summary: 'Tests failed!'
-          notification-color: 'F85149'  # Red 
+          notification-summary: 'Linting tests failed!'
+          notification-color: 'F85149'  # Red
           timezone: Europe/Berlin
