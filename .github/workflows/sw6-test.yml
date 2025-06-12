@@ -17,6 +17,11 @@ on:
         required: false
         default: 'linters'
         type: string
+      notify-users:
+        description: 'Comma-separated list of GitHub usernames to notify (e.g. "user1,user2")'
+        required: false
+        default: ''
+        type: string
     secrets:
       CURR_VAULT_PATH:
         required: true
@@ -236,11 +241,13 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           
           FAILED_TESTS=""
+          FAILED_DETAILS=""
           
           # Check each test result
           if [ "${{ env.COMPOSER_CHECK_FAILED }}" = "true" ]; then
             echo "❌ **Composer Version Check**: Failed - Please update composer version" >> $GITHUB_STEP_SUMMARY
             FAILED_TESTS="$FAILED_TESTS composer"
+            FAILED_DETAILS="$FAILED_DETAILS\n• Composer Version Check: Please update composer version"
           else
             echo "✅ **Composer Version Check**: Passed" >> $GITHUB_STEP_SUMMARY
           fi
@@ -248,6 +255,7 @@ jobs:
           if [ "${{ env.README_CHECK_FAILED }}" = "true" ]; then
             echo "❌ **README Check**: Failed - Please update README with version info" >> $GITHUB_STEP_SUMMARY
             FAILED_TESTS="$FAILED_TESTS readme"
+            FAILED_DETAILS="$FAILED_DETAILS\n• README Check: Please update README with version info"
           else
             echo "✅ **README Check**: Passed" >> $GITHUB_STEP_SUMMARY
           fi
@@ -255,6 +263,7 @@ jobs:
           if [ "${{ env.PHPSTAN_FAILED }}" = "true" ]; then
             echo "❌ **PHPStan**: Failed - PHP static analysis errors found" >> $GITHUB_STEP_SUMMARY
             FAILED_TESTS="$FAILED_TESTS phpstan"
+            FAILED_DETAILS="$FAILED_DETAILS\n• PHPStan: PHP static analysis errors found"
           else
             echo "✅ **PHPStan**: Passed" >> $GITHUB_STEP_SUMMARY
           fi
@@ -262,6 +271,7 @@ jobs:
           if [ "${{ env.ESLINT_FAILED }}" = "true" ]; then
             echo "❌ **ESLint**: Failed - JavaScript/Vue linting errors found" >> $GITHUB_STEP_SUMMARY
             FAILED_TESTS="$FAILED_TESTS eslint"
+            FAILED_DETAILS="$FAILED_DETAILS\n• ESLint: JavaScript/Vue linting errors found"
           else
             echo "✅ **ESLint**: Passed" >> $GITHUB_STEP_SUMMARY
           fi
@@ -269,11 +279,18 @@ jobs:
           if [ "${{ env.STYLELINT_FAILED }}" = "true" ]; then
             echo "❌ **Stylelint**: Failed - CSS/SCSS linting errors found" >> $GITHUB_STEP_SUMMARY
             FAILED_TESTS="$FAILED_TESTS stylelint"
+            FAILED_DETAILS="$FAILED_DETAILS\n• Stylelint: CSS/SCSS linting errors found"
           else
             echo "✅ **Stylelint**: Passed" >> $GITHUB_STEP_SUMMARY
           fi
           
           echo "" >> $GITHUB_STEP_SUMMARY
+          
+          # Save results for Teams notification
+          echo "FAILED_TESTS=$FAILED_TESTS" >> $GITHUB_ENV
+          echo "FAILED_DETAILS<<EOF" >> $GITHUB_ENV
+          echo -e "$FAILED_DETAILS" >> $GITHUB_ENV
+          echo "EOF" >> $GITHUB_ENV
           
           # Final result
           if [ -n "$FAILED_TESTS" ]; then
@@ -287,15 +304,84 @@ jobs:
             echo "OVERALL_FAILED=false" >> $GITHUB_ENV
           fi
 
-      - name: Fail job if any tests failed
-        if: env.OVERALL_FAILED == 'true'
+      - name: Prepare Teams notification message
+        if: always()
         run: |
-          echo "❌ One or more tests failed. Check the summary above for details."
-          exit 1
+          # Parse user mapping from organization variable
+          # Expected format: "github_user1:email1@domain.com,github_user2:email2@domain.com"
+          declare -A EMAIL_MAP=()
+          
+          if [ -n "${{ vars.TEAMS_USER_MAPPING }}" ]; then
+            echo "📧 Loading user email mapping from organization variable..."
+            IFS=',' read -ra USER_PAIRS <<< "${{ vars.TEAMS_USER_MAPPING }}"
+            for pair in "${USER_PAIRS[@]}"; do
+              # Split by colon and clean whitespace
+              IFS=':' read -ra MAPPING <<< "$pair"
+              if [ ${#MAPPING[@]} -eq 2 ]; then
+                github_user=$(echo "${MAPPING[0]}" | xargs)
+                email=$(echo "${MAPPING[1]}" | xargs)
+                EMAIL_MAP["$github_user"]="$email"
+                echo "  $github_user -> $email"
+              fi
+            done
+          else
+            echo "⚠️ No TEAMS_USER_MAPPING variable found in organization settings"
+          fi
+          
+          # Prepare user mentions
+          MENTIONS=""
+          if [ -n "${{ inputs.notify-users }}" ]; then
+            IFS=',' read -ra USERS <<< "${{ inputs.notify-users }}"
+            for user in "${USERS[@]}"; do
+              # Clean whitespace
+              clean_user=$(echo "$user" | xargs)
+              if [ -n "$clean_user" ]; then
+                # Use mapped email if available, otherwise use GitHub username
+                if [ -n "${EMAIL_MAP[$clean_user]}" ]; then
+                  MENTIONS="$MENTIONS <at>${EMAIL_MAP[$clean_user]}</at>"
+                  echo "✅ Mapping $clean_user to ${EMAIL_MAP[$clean_user]}"
+                else
+                  # Fallback to GitHub username if no mapping found
+                  MENTIONS="$MENTIONS @$clean_user"
+                  echo "⚠️ No email mapping found for $clean_user, using GitHub username"
+                fi
+              fi
+            done
+          fi
+          
+          # Determine message color and status
+          if [ "${{ env.OVERALL_FAILED }}" = "true" ]; then
+            COLOR="F85149"  # Red
+            STATUS="FAILED ❌"
+            SUMMARY="Pipeline failed with the following issues:${{ env.FAILED_DETAILS }}"
+          else
+            COLOR="28A745"  # Green  
+            STATUS="PASSED ✅"
+            SUMMARY="All tests passed successfully!"
+          fi
+          
+          # Create message
+          MESSAGE="**Shopware Plugin Test Results**\n\n"
+          MESSAGE="${MESSAGE}**Repository:** ${{ github.repository }}\n"
+          MESSAGE="${MESSAGE}**Branch:** ${{ github.ref_name }}\n"
+          MESSAGE="${MESSAGE}**Commit:** [\`${{ github.sha:0:7 }}\`](${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }})\n"
+          MESSAGE="${MESSAGE}**Workflow:** [Run #${{ github.run_number }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})\n\n"
+          MESSAGE="${MESSAGE}**Status:** $STATUS\n\n"
+          MESSAGE="${MESSAGE}$SUMMARY"
+          
+          if [ -n "$MENTIONS" ]; then
+            MESSAGE="${MESSAGE}\n\n$MENTIONS"
+          fi
+          
+          # Save for Teams step
+          echo "TEAMS_COLOR=$COLOR" >> $GITHUB_ENV
+          echo "TEAMS_MESSAGE<<EOF" >> $GITHUB_ENV
+          echo -e "$MESSAGE" >> $GITHUB_ENV
+          echo "EOF" >> $GITHUB_ENV
 
       - name: Fetch secrets from Vault for testing
         id: fetch_secrets
-        if: failure()
+        if: always()
         uses: hashicorp/vault-action@v2.7.4
         with:
           url: ${{ vars.VAULT_SERVER }}
@@ -304,12 +390,19 @@ jobs:
           secrets: |
             deployment/data/store/sw6 ms_teams_webhook_uri | MS_TEAMS_WEBHOOK_URI
 
-      - name: Notify teams on failure
-        if: failure()
+      - name: Notify teams with detailed results
+        if: always()
         uses: jdcargile/ms-teams-notification@v1.4
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           ms-teams-webhook-uri: ${{ env.MS_TEAMS_WEBHOOK_URI }}
-          notification-summary: 'Linting tests failed!'
-          notification-color: 'F85149'  # Red
+          notification-summary: 'Pipeline ${{ env.OVERALL_FAILED == ''true'' && ''Failed'' || ''Passed'' }}'
+          notification-color: ${{ env.TEAMS_COLOR }}
+          notification-message: ${{ env.TEAMS_MESSAGE }}
           timezone: Europe/Berlin
+
+      - name: Fail job if any tests failed
+        if: env.OVERALL_FAILED == 'true'
+        run: |
+          echo "❌ One or more tests failed. Check the summary above for details."
+          exit 1
