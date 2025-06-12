@@ -393,6 +393,9 @@ jobs:
       - name: Send Teams notification with custom content
         if: always()
         run: |
+          # Get short SHA
+          SHORT_SHA=$(echo '${{ github.sha }}' | cut -c1-7)
+          
           # Create custom Teams webhook payload
           cat > teams-payload.json << EOF
           {
@@ -401,7 +404,7 @@ jobs:
             "themeColor": "${{ env.TEAMS_COLOR }}",
             "summary": "Pipeline ${{ env.OVERALL_FAILED == 'true' && 'Failed' || 'Passed' }}",
             "sections": [{
-              "activityTitle": "**Shopware Plugin Test Results**",
+              "activityTitle": "Shopware Plugin Test Results",
               "activitySubtitle": "${{ github.repository }}",
               "activityImage": "https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png",
               "facts": [
@@ -415,7 +418,7 @@ jobs:
                 },
                 {
                   "name": "Commit:",
-                  "value": "[\`$(echo '${{ github.sha }}' | cut -c1-7)\`](${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }})"
+                  "value": "[\`${SHORT_SHA}\`](${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }})"
                 },
                 {
                   "name": "Workflow:",
@@ -426,8 +429,7 @@ jobs:
                   "value": "${{ env.OVERALL_FAILED == 'true' && 'FAILED ❌' || 'PASSED ✅' }}"
                 }
               ],
-              "markdown": true,
-              "text": "${{ env.TEAMS_MESSAGE }}"
+              "markdown": true
             }],
             "potentialAction": [{
               "@type": "OpenUri",
@@ -439,6 +441,109 @@ jobs:
             }]
           }
           EOF
+          
+          # Add custom text section with proper line breaks and user mentions
+          if [ "${{ env.OVERALL_FAILED }}" = "true" ]; then
+            # Create failed message with details and mentions
+            python3 << 'PYTHON_EOF'
+          import json
+          import os
+          
+          # Parse user mapping from organization variable
+          email_map = {}
+          user_mapping = os.environ.get('${{ vars.TEAMS_USER_MAPPING }}', '')
+          if user_mapping:
+              for pair in user_mapping.split(','):
+                  if ':' in pair:
+                      github_user, email = pair.split(':', 1)
+                      email_map[github_user.strip()] = email.strip()
+          
+          # Prepare user mentions
+          mentions = ""
+          notify_users = "${{ inputs.notify-users }}"
+          if notify_users:
+              for user in notify_users.split(','):
+                  clean_user = user.strip()
+                  if clean_user and clean_user in email_map:
+                      mentions += f"<at>{email_map[clean_user]}</at> "
+                  elif clean_user:
+                      mentions += f"@{clean_user} "
+          
+          # Load the JSON
+          with open('teams-payload.json', 'r') as f:
+              payload = json.load(f)
+          
+          # Create detailed text with proper formatting
+          details = os.environ.get('FAILED_DETAILS', '').replace('\\n', '\n')
+          text_content = f"""
+          **Pipeline Failed** ❌
+          
+          The following issues were found:
+          {details}
+          
+          Please check the workflow run for detailed error messages.
+          
+          {mentions.strip()}
+          """.strip()
+          
+          # Add text section
+          payload['sections'][0]['text'] = text_content
+          
+          # Save updated JSON
+          with open('teams-payload.json', 'w') as f:
+              json.dump(payload, f, indent=2)
+          PYTHON_EOF
+          
+          else
+            # Create success message
+            python3 << 'PYTHON_EOF'
+          import json
+          import os
+          
+          # Parse user mapping
+          email_map = {}
+          user_mapping = os.environ.get('${{ vars.TEAMS_USER_MAPPING }}', '')
+          if user_mapping:
+              for pair in user_mapping.split(','):
+                  if ':' in pair:
+                      github_user, email = pair.split(':', 1)
+                      email_map[github_user.strip()] = email.strip()
+          
+          # Prepare user mentions
+          mentions = ""
+          notify_users = "${{ inputs.notify-users }}"
+          if notify_users:
+              for user in notify_users.split(','):
+                  clean_user = user.strip()
+                  if clean_user and clean_user in email_map:
+                      mentions += f"<at>{email_map[clean_user]}</at> "
+          
+          # Load the JSON
+          with open('teams-payload.json', 'r') as f:
+              payload = json.load(f)
+          
+          # Create success text
+          text_content = f"""
+          **All Tests Passed** ✅
+          
+          Great job! All linting and validation checks passed successfully.
+          
+          {mentions.strip()}
+          """.strip()
+          
+          # Add text section
+          payload['sections'][0]['text'] = text_content
+          
+          # Save updated JSON
+          with open('teams-payload.json', 'w') as f:
+              json.dump(payload, f, indent=2)
+          PYTHON_EOF
+          
+          fi
+          
+          # Debug: Show final payload
+          echo "=== Final Teams Payload ==="
+          cat teams-payload.json
           
           # Send to Teams webhook
           curl -X POST \
