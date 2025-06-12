@@ -366,66 +366,161 @@ jobs:
           
           print(f"Debug: notify_user={notify_user}, user_email={user_email}, display_name={user_display_name}")
           
-          # Create test results text
-          test_results = []
+          # Create test results as separate text blocks
+          body_elements = [
+              {
+                  "type": "TextBlock",
+                  "text": "Shopware Plugin Test Results",
+                  "weight": "Bolder",
+                  "size": "Large"
+              },
+              {
+                  "type": "TextBlock",
+                  "text": "${{ github.repository }}",
+                  "spacing": "None",
+                  "isSubtle": True
+              },
+              {
+                  "type": "FactSet",
+                  "facts": [
+                      {
+                          "title": "Branch:",
+                          "value": "${{ github.ref_name }}"
+                      },
+                      {
+                          "title": "Commit:",
+                          "value": f"[{github_sha[:7]}](${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }})"
+                      },
+                      {
+                          "title": "Workflow:",
+                          "value": "[Run #${{ github.run_number }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})"
+                      }
+                  ],
+                  "separator": True
+              }
+          ]
           
+          # Add test results as separate text blocks
+          body_elements.append({
+              "type": "Container",
+              "separator": True,
+              "items": []
+          })
+          
+          # Add each test result
           if os.environ.get('COMPOSER_CHECK_FAILED', 'false') == 'true':
-              test_results.append("❌ **Composer Version Check**: Failed - Please update composer version")
+              body_elements[-1]["items"].append({
+                  "type": "TextBlock",
+                  "text": "❌ **Composer Version Check**: Failed - Please update composer version",
+                  "wrap": True
+              })
           else:
-              test_results.append("✅ **Composer Version Check**: Passed")
+              body_elements[-1]["items"].append({
+                  "type": "TextBlock",
+                  "text": "✅ **Composer Version Check**: Passed",
+                  "wrap": True
+              })
           
           if os.environ.get('README_CHECK_FAILED', 'false') == 'true':
-              test_results.append("❌ **README Check**: Failed - Please update README with version info")
+              body_elements[-1]["items"].append({
+                  "type": "TextBlock",
+                  "text": "❌ **README Check**: Failed - Please update README with version info",
+                  "wrap": True
+              })
           else:
-              test_results.append("✅ **README Check**: Passed")
+              body_elements[-1]["items"].append({
+                  "type": "TextBlock",
+                  "text": "✅ **README Check**: Passed",
+                  "wrap": True
+              })
           
           if os.environ.get('PHPSTAN_FAILED', 'false') == 'true':
-              test_results.append("❌ **PHPStan**: Failed - PHP static analysis errors found")
+              body_elements[-1]["items"].append({
+                  "type": "TextBlock",
+                  "text": "❌ **PHPStan**: Failed - PHP static analysis errors found",
+                  "wrap": True
+              })
           else:
-              test_results.append("✅ **PHPStan**: Passed")
+              body_elements[-1]["items"].append({
+                  "type": "TextBlock",
+                  "text": "✅ **PHPStan**: Passed",
+                  "wrap": True
+              })
           
           if os.environ.get('ESLINT_FAILED', 'false') == 'true':
-              test_results.append("❌ **ESLint**: Failed - JavaScript/Vue linting errors found")
+              body_elements[-1]["items"].append({
+                  "type": "TextBlock",
+                  "text": "❌ **ESLint**: Failed - JavaScript/Vue linting errors found",
+                  "wrap": True
+              })
           else:
-              test_results.append("✅ **ESLint**: Passed")
+              body_elements[-1]["items"].append({
+                  "type": "TextBlock",
+                  "text": "✅ **ESLint**: Passed",
+                  "wrap": True
+              })
           
           if os.environ.get('STYLELINT_FAILED', 'false') == 'true':
-              test_results.append("❌ **Stylelint**: Failed - CSS/SCSS linting errors found")
+              body_elements[-1]["items"].append({
+                  "type": "TextBlock",
+                  "text": "❌ **Stylelint**: Failed - CSS/SCSS linting errors found",
+                  "wrap": True
+              })
           else:
-              test_results.append("✅ **Stylelint**: Passed")
+              body_elements[-1]["items"].append({
+                  "type": "TextBlock",
+                  "text": "✅ **Stylelint**: Passed",
+                  "wrap": True
+              })
           
-          # Determine overall status
+          # Add overall result
           if os.environ.get('OVERALL_FAILED', 'false') == 'true':
-              overall_result = "🔴 **Overall Result**: FAILED"
-              action_text = "Please fix the above issues and try again."
               color = "F85149"  # Red
               summary = "Pipeline Failed ❌"
+              body_elements.append({
+                  "type": "TextBlock",
+                  "text": "🔴 **Overall Result**: FAILED",
+                  "weight": "Bolder",
+                  "size": "Medium",
+                  "spacing": "Large",
+                  "wrap": True
+              })
+              body_elements.append({
+                  "type": "TextBlock",
+                  "text": "Please fix the above issues and try again.",
+                  "spacing": "Small",
+                  "wrap": True
+              })
           else:
-              overall_result = "🟢 **Overall Result**: ALL TESTS PASSED"
-              action_text = "Great job! All linting and validation checks passed successfully."
               color = "28A745"  # Green
               summary = "Pipeline Passed ✅"
-          
-          # Get short SHA
-          github_sha = "${{ github.sha }}"
-          short_sha = github_sha[:7]
-          
-          # Build the message text
-          message_parts = []
-          message_parts.append("\\n".join(test_results))
-          message_parts.append("\\n")
-          message_parts.append(overall_result)
-          message_parts.append("\\n")
-          message_parts.append(action_text)
+              body_elements.append({
+                  "type": "TextBlock",
+                  "text": "🟢 **Overall Result**: ALL TESTS PASSED",
+                  "weight": "Bolder",
+                  "size": "Medium",
+                  "spacing": "Large",
+                  "wrap": True
+              })
+              body_elements.append({
+                  "type": "TextBlock",
+                  "text": "Great job! All linting and validation checks passed successfully.",
+                  "spacing": "Small",
+                  "wrap": True
+              })
           
           # Add mention if we have a mapping
+          mention_text = ""
           if notify_user and user_email and user_display_name:
-              message_parts.append("\\n\\n")
-              message_parts.append(f"<at>{user_display_name}</at>")
+              mention_text = f"<at>{user_display_name}</at>"
+              body_elements.append({
+                  "type": "TextBlock",
+                  "text": mention_text,
+                  "spacing": "Large",
+                  "wrap": True
+              })
           
-          message_text = "".join(message_parts)
-          
-          # Create Adaptive Card payload (required for mentions in webhooks)
+          # Create Adaptive Card payload
           payload = {
               "type": "message",
               "attachments": [
@@ -435,44 +530,7 @@ jobs:
                           "type": "AdaptiveCard",
                           "$schema": "http://adaptivecards.io/schemas/adaptive-card.json",
                           "version": "1.3",
-                          "body": [
-                              {
-                                  "type": "TextBlock",
-                                  "text": "Shopware Plugin Test Results",
-                                  "weight": "Bolder",
-                                  "size": "Large"
-                              },
-                              {
-                                  "type": "TextBlock",
-                                  "text": "${{ github.repository }}",
-                                  "spacing": "None",
-                                  "isSubtle": True
-                              },
-                              {
-                                  "type": "FactSet",
-                                  "facts": [
-                                      {
-                                          "title": "Branch:",
-                                          "value": "${{ github.ref_name }}"
-                                      },
-                                      {
-                                          "title": "Commit:",
-                                          "value": f"[{short_sha}](${{ github.server_url }}/${{ github.repository }}/commit/{github_sha})"
-                                      },
-                                      {
-                                          "title": "Workflow:",
-                                          "value": "[Run #${{ github.run_number }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})"
-                                      }
-                                  ],
-                                  "separator": True
-                              },
-                              {
-                                  "type": "TextBlock",
-                                  "text": message_text,
-                                  "wrap": True,
-                                  "separator": True
-                              }
-                          ],
+                          "body": body_elements,
                           "actions": [
                               {
                                   "type": "Action.OpenUrl",
@@ -493,7 +551,7 @@ jobs:
               payload["attachments"][0]["content"]["msteams"]["entities"] = [
                   {
                       "type": "mention",
-                      "text": f"<at>{user_display_name}</at>",
+                      "text": mention_text,
                       "mentioned": {
                           "id": user_email,
                           "name": user_display_name
@@ -517,6 +575,7 @@ jobs:
             -H "Content-Type: application/json" \
             -d @teams-payload.json \
             "${{ env.MS_TEAMS_WEBHOOK_URI }}"
+
 
       - name: Fail job if any tests failed
         if: env.OVERALL_FAILED == 'true'
