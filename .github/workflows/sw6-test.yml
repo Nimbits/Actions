@@ -416,8 +416,9 @@ jobs:
               message_parts.append("")
               message_parts.append(f"<at>{user_display_name}</at>")
           
-          # Join with actual newlines
-          message_text = "\n".join(message_parts)
+          # Join with proper line breaks for Teams
+          # Teams Adaptive Cards require double newlines for proper spacing
+          message_text = "\\n\\n".join(message_parts)
           
           # Get short SHA
           github_sha = "${{ github.sha }}"
@@ -468,7 +469,9 @@ jobs:
                                   "type": "TextBlock",
                                   "text": message_text,
                                   "wrap": True,
-                                  "separator": True
+                                  "separator": True,
+                                  "size": "Default",
+                                  "weight": "Default"
                               }
                           ],
                           "actions": [
