@@ -374,45 +374,58 @@ jobs:
           else:
               message_parts.append("✅ **Composer Version Check**: Passed")
           
+          message_parts.append("")
+          
           if os.environ.get('README_CHECK_FAILED', 'false') == 'true':
               message_parts.append("❌ **README Check**: Failed - Please update README with version info")
           else:
               message_parts.append("✅ **README Check**: Passed")
+          
+          message_parts.append("")
           
           if os.environ.get('PHPSTAN_FAILED', 'false') == 'true':
               message_parts.append("❌ **PHPStan**: Failed - PHP static analysis errors found")
           else:
               message_parts.append("✅ **PHPStan**: Passed")
           
+          message_parts.append("")
+          
           if os.environ.get('ESLINT_FAILED', 'false') == 'true':
               message_parts.append("❌ **ESLint**: Failed - JavaScript/Vue linting errors found")
           else:
               message_parts.append("✅ **ESLint**: Passed")
+          
+          message_parts.append("")
           
           if os.environ.get('STYLELINT_FAILED', 'false') == 'true':
               message_parts.append("❌ **Stylelint**: Failed - CSS/SCSS linting errors found")
           else:
               message_parts.append("✅ **Stylelint**: Passed")
           
-          # Join the test results with double line breaks
-          test_results_text = "  \\n".join(message_parts)
-          
           # Add empty line before overall result
-          test_results_text += "  \\n  \\n"
+          message_parts.append("")
           
           # Determine overall status
           if os.environ.get('OVERALL_FAILED', 'false') == 'true':
-              test_results_text += "🔴 **Overall Result**: FAILED  \\n  \\nPlease fix the above issues and try again."
+              message_parts.append("🔴 **Overall Result**: FAILED")
+              message_parts.append("")
+              message_parts.append("Please fix the above issues and try again.")
               color = "F85149"  # Red
               summary = "Pipeline Failed ❌"
           else:
-              test_results_text += "🟢 **Overall Result**: ALL TESTS PASSED  \\n  \\nGreat job! All linting and validation checks passed successfully."
+              message_parts.append("🟢 **Overall Result**: ALL TESTS PASSED")
+              message_parts.append("")
+              message_parts.append("Great job! All linting and validation checks passed successfully.")
               color = "28A745"  # Green
               summary = "Pipeline Passed ✅"
           
           # Add mention if we have a mapping
           if notify_user and user_email and user_display_name:
-              test_results_text += f"  \\n  \\n<at>{user_display_name}</at>"
+              message_parts.append("")
+              message_parts.append(f"<at>{user_display_name}</at>")
+          
+          # Join with actual newlines
+          message_text = "\n".join(message_parts)
           
           # Get short SHA
           github_sha = "${{ github.sha }}"
@@ -461,11 +474,9 @@ jobs:
                               },
                               {
                                   "type": "TextBlock",
-                                  "text": test_results_text,
+                                  "text": message_text,
                                   "wrap": True,
-                                  "separator": True,
-                                  "size": "Default",
-                                  "weight": "Default"
+                                  "separator": True
                               }
                           ],
                           "actions": [
@@ -512,7 +523,7 @@ jobs:
             -H "Content-Type: application/json" \
             -d @teams-payload.json \
             "${{ env.MS_TEAMS_WEBHOOK_URI }}"
-            
+
 
       - name: Fail job if any tests failed
         if: env.OVERALL_FAILED == 'true'
