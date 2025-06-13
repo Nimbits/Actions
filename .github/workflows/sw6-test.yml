@@ -394,31 +394,25 @@ jobs:
           else:
               message_parts.append("✅ **Stylelint**: Passed")
           
+          # Join the test results with double line breaks
+          test_results_text = "  \\n".join(message_parts)
+          
           # Add empty line before overall result
-          message_parts.append("")
+          test_results_text += "  \\n  \\n"
           
           # Determine overall status
           if os.environ.get('OVERALL_FAILED', 'false') == 'true':
-              message_parts.append("🔴 **Overall Result**: FAILED")
-              message_parts.append("")
-              message_parts.append("Please fix the above issues and try again.")
+              test_results_text += "🔴 **Overall Result**: FAILED  \\n  \\nPlease fix the above issues and try again."
               color = "F85149"  # Red
               summary = "Pipeline Failed ❌"
           else:
-              message_parts.append("🟢 **Overall Result**: ALL TESTS PASSED")
-              message_parts.append("")
-              message_parts.append("Great job! All linting and validation checks passed successfully.")
+              test_results_text += "🟢 **Overall Result**: ALL TESTS PASSED  \\n  \\nGreat job! All linting and validation checks passed successfully."
               color = "28A745"  # Green
               summary = "Pipeline Passed ✅"
           
           # Add mention if we have a mapping
           if notify_user and user_email and user_display_name:
-              message_parts.append("")
-              message_parts.append(f"<at>{user_display_name}</at>")
-          
-          # Join with proper line breaks for Teams
-          # Teams Adaptive Cards require double newlines for proper spacing
-          message_text = "\\n\\n".join(message_parts)
+              test_results_text += f"  \\n  \\n<at>{user_display_name}</at>"
           
           # Get short SHA
           github_sha = "${{ github.sha }}"
@@ -467,7 +461,7 @@ jobs:
                               },
                               {
                                   "type": "TextBlock",
-                                  "text": message_text,
+                                  "text": test_results_text,
                                   "wrap": True,
                                   "separator": True,
                                   "size": "Default",
@@ -518,7 +512,7 @@ jobs:
             -H "Content-Type: application/json" \
             -d @teams-payload.json \
             "${{ env.MS_TEAMS_WEBHOOK_URI }}"
-
+            
 
       - name: Fail job if any tests failed
         if: env.OVERALL_FAILED == 'true'
