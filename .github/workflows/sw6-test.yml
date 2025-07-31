@@ -73,6 +73,7 @@ jobs:
       - name: Setup PHP
         uses: shivammathur/setup-php@v2
         with:
+          github-token: ${{ secrets.DEPENDENCY_TOKEN }}
           php-version: ${{ inputs.php-version }}
           tools: composer:${{ inputs.composer-version }}
 
