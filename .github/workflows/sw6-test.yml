@@ -13,6 +13,11 @@ on:
         required: false
         default: "8.2"
         type: string
+      composer-version:
+        description: 'PHP version for PHPStan'
+        required: false
+        default: "2.8.9"
+        type: string
     secrets:
       CURR_VAULT_PATH:
         required: true
@@ -69,6 +74,7 @@ jobs:
         uses: shivammathur/setup-php@v2
         with:
           php-version: ${{ inputs.php-version }}
+          tools: composer:${{ inputs.composer-version }}
 
       - name: Install dependencies
         run: |
