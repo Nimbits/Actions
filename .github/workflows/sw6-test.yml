@@ -1,5 +1,4 @@
 name: 'Shopware 6 Plugin Test'
-
 on:
   workflow_call:
     inputs:
@@ -7,11 +6,16 @@ on:
         description: 'PHPStan analysis level'
         required: false
         default: '5'
-        type: 'string'
+        type: string
       php-version:
         description: 'PHP version for PHPStan'
         required: false
-        default: "8.2"
+        default: '8.2'
+        type: string
+      cli-branch:
+        description: 'CLI branch to use for configs'
+        required: false
+        default: 'linters'
         type: string
       composer-version:
         description: 'PHP version for PHPStan'
@@ -29,10 +33,54 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4.1.1
+
+      - name: Download linting configs from CLI repo
+        run: |
+          echo "📥 Downloading linting configurations..."
+          mkdir -p .github/lint-configs
+          
+          # Download package.json from CLI repo
+          curl -H "Authorization: token ${{ secrets.DEPENDENCY_TOKEN }}" \
+               -H "Accept: application/vnd.github.v3.raw" \
+               -o .github/lint-configs/package.json \
+               "https://api.github.com/repos/Nimbits/cli/contents/package.json?ref=${{ inputs.cli-branch }}"
+          
+          # Download pnpm-lock.yaml from CLI repo
+          curl -H "Authorization: token ${{ secrets.DEPENDENCY_TOKEN }}" \
+               -H "Accept: application/vnd.github.v3.raw" \
+               -o .github/lint-configs/pnpm-lock.yaml \
+               "https://api.github.com/repos/Nimbits/cli/contents/pnpm-lock.yaml?ref=${{ inputs.cli-branch }}"
+          
+          # Download PHPStan config
+          curl -H "Authorization: token ${{ secrets.DEPENDENCY_TOKEN }}" \
+               -H "Accept: application/vnd.github.v3.raw" \
+               -o .github/lint-configs/phpstan.neon \
+               "https://api.github.com/repos/Nimbits/cli/contents/configs/phpstan.neon?ref=${{ inputs.cli-branch }}"
+          
+          # Download ESLint config
+          curl -H "Authorization: token ${{ secrets.DEPENDENCY_TOKEN }}" \
+               -H "Accept: application/vnd.github.v3.raw" \
+               -o .github/lint-configs/eslint.config.js \
+               "https://api.github.com/repos/Nimbits/cli/contents/configs/eslint.config.js?ref=${{ inputs.cli-branch }}"
+          
+          # Download Stylelint config
+          curl -H "Authorization: token ${{ secrets.DEPENDENCY_TOKEN }}" \
+               -H "Accept: application/vnd.github.v3.raw" \
+               -o .github/lint-configs/.stylelintrc.json \
+               "https://api.github.com/repos/Nimbits/cli/contents/configs/.stylelintrc.json?ref=${{ inputs.cli-branch }}"
+          
+          # Download Stylelint ignore file
+          curl -H "Authorization: token ${{ secrets.DEPENDENCY_TOKEN }}" \
+               -H "Accept: application/vnd.github.v3.raw" \
+               -o .github/lint-configs/.stylelintignore \
+               "https://api.github.com/repos/Nimbits/cli/contents/configs/.stylelintignore?ref=${{ inputs.cli-branch }}"
+          
+          echo "✅ Downloaded configurations:"
+          ls -la .github/lint-configs/
 
       - name: Determine Base Branch
         id: basebranch
@@ -42,9 +90,11 @@ jobs:
           else
             echo "branch=$(git ls-remote --heads origin master | grep -q master && echo master || (git ls-remote --heads origin main | grep -q main && echo main))" >> $GITHUB_ENV
           fi
-  
+
       - name: Check composer version
         if: github.event_name != 'release'
+        continue-on-error: true
+        id: composer-check
         run: |
           git fetch origin ${{ env.branch }}:${{ env.branch }}
           BASE_VERSION=$(jq -r '.version' composer.json -c)
@@ -52,22 +102,30 @@ jobs:
           CURRENT_VERSION=$(jq -r '.version' composer.json -c)
           git checkout -
           if [ "$GITHUB_REF_NAME" != "${{ env.branch }}" ] && [ "$BASE_VERSION" == "$CURRENT_VERSION" ]; then
-            echo "Please change the composer version"
+            echo "❌ Please change the composer version"
+            echo "COMPOSER_CHECK_FAILED=true" >> $GITHUB_ENV
             exit 1
+          else
+            echo "✅ Composer version check passed"
+            echo "COMPOSER_CHECK_FAILED=false" >> $GITHUB_ENV
           fi
 
-      
       - name: Check for README changes
         if: github.event_name != 'release'
+        continue-on-error: true
+        id: readme-check
         run: |
           git fetch origin ${{ env.branch }}
           if ! git diff --name-only HEAD origin/${{ env.branch }} | grep -q "README"; then
-            echo "Please add the version to the readme"
+            echo "❌ Please add the version to the readme"
+            echo "README_CHECK_FAILED=true" >> $GITHUB_ENV
             exit 1
+          else
+            echo "✅ README check passed"
+            echo "README_CHECK_FAILED=false" >> $GITHUB_ENV
           fi
 
-
-      - name: Configure GitHub token #needed for vcs dependencies
+      - name: Configure GitHub token
         run: composer config --global --auth github-oauth.github.com ${{ secrets.DEPENDENCY_TOKEN }}
 
       - name: Setup PHP
@@ -77,21 +135,180 @@ jobs:
           php-version: ${{ inputs.php-version }}
           tools: composer:${{ inputs.composer-version }}
 
-      - name: Install dependencies
+      - name: Install PHP dependencies
+        run: composer install
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install pnpm
+        run: npm install -g pnpm
+
+      - name: Install Node.js linting dependencies from CLI
         run: |
-          composer install
+          echo "📦 Installing Node.js dependencies from CLI package.json..."
+          cd .github/lint-configs
+          
+          # Show what files we have
+          echo "Downloaded files:"
+          ls -la
+          
+          # Show package.json content for verification
+          echo "CLI package.json content:"
+          cat package.json
+          
+          # Check if pnpm-lock.yaml was downloaded
+          if [ -f "pnpm-lock.yaml" ]; then
+            echo "✅ pnpm-lock.yaml found, using frozen lockfile"
+            pnpm install --frozen-lockfile
+          else
+            echo "⚠️ pnpm-lock.yaml not found, installing without frozen lockfile"
+            pnpm install --no-frozen-lockfile
+          fi
+          
+          echo "✅ Installed linting dependencies:"
+          ls -la node_modules/.bin/ | grep -E "(eslint|stylelint)" || echo "No linting tools found in bin"
+          
+          cd ../..
 
       - name: PHPStan
+        continue-on-error: true
+        id: phpstan
         uses: php-actions/phpstan@v3
         with:
+          configuration: .github/lint-configs/phpstan.neon
           version: composer
           path: src/
           level: ${{ inputs.phpstan-level }}
           php_version: ${{ inputs.php-version }}
 
+      - name: Set PHPStan result
+        run: |
+          if [ "${{ steps.phpstan.outcome }}" = "failure" ]; then
+            echo "PHPSTAN_FAILED=true" >> $GITHUB_ENV
+          else
+            echo "PHPSTAN_FAILED=false" >> $GITHUB_ENV
+          fi
+
+      - name: Run ESLint
+        continue-on-error: true
+        id: eslint
+        run: |
+          echo "🔍 Running ESLint analysis..."
+          # Check if JS/Vue files exist
+          if find . -name "*.js" -o -name "*.vue" | grep -v node_modules | grep -v vendor | head -1 | read; then
+            echo "Found JS/Vue files, running ESLint..."
+            # Run ESLint from project root with correct config path
+            npx --prefix .github/lint-configs eslint \
+              --config=.github/lint-configs/eslint.config.js \
+              .
+            echo "ESLINT_FAILED=false" >> $GITHUB_ENV
+          else
+            echo "No JS/Vue files found to lint"
+            echo "ESLINT_FAILED=false" >> $GITHUB_ENV
+          fi
+
+      - name: Set ESLint result
+        if: steps.eslint.outcome == 'failure'
+        run: echo "ESLINT_FAILED=true" >> $GITHUB_ENV
+
+      - name: Run Stylelint
+        continue-on-error: true
+        id: stylelint
+        run: |
+          echo "🔍 Running Stylelint analysis..."
+          # Check if CSS/SCSS files exist
+          if find . -name "*.css" -o -name "*.scss" -o -name "*.sass" | grep -v node_modules | grep -v vendor | head -1 | read; then
+            echo "Found CSS/SCSS files, running Stylelint..."
+            # Run Stylelint from project root with correct config path
+            npx --prefix .github/lint-configs stylelint \
+              --config=.github/lint-configs/.stylelintrc.json \
+              --ignore-path=.github/lint-configs/.stylelintignore \
+              "**/*.{css,scss,sass}"
+            echo "STYLELINT_FAILED=false" >> $GITHUB_ENV
+          else
+            echo "No CSS/SCSS files found to lint"
+            echo "STYLELINT_FAILED=false" >> $GITHUB_ENV
+          fi
+
+      - name: Set Stylelint result
+        if: steps.stylelint.outcome == 'failure'
+        run: echo "STYLELINT_FAILED=true" >> $GITHUB_ENV
+
+      - name: Test Results Summary
+        run: |
+          echo "## 📋 Test Results Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          FAILED_TESTS=""
+          FAILED_DETAILS=""
+          
+          # Check each test result
+          if [ "${{ env.COMPOSER_CHECK_FAILED }}" = "true" ]; then
+            echo "❌ **Composer Version Check**: Failed - Please update composer version" >> $GITHUB_STEP_SUMMARY
+            FAILED_TESTS="$FAILED_TESTS composer"
+            FAILED_DETAILS="$FAILED_DETAILS\n• Composer Version Check: Please update composer version"
+          else
+            echo "✅ **Composer Version Check**: Passed" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          if [ "${{ env.README_CHECK_FAILED }}" = "true" ]; then
+            echo "❌ **README Check**: Failed - Please update README with version info" >> $GITHUB_STEP_SUMMARY
+            FAILED_TESTS="$FAILED_TESTS readme"
+            FAILED_DETAILS="$FAILED_DETAILS\n• README Check: Please update README with version info"
+          else
+            echo "✅ **README Check**: Passed" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          if [ "${{ env.PHPSTAN_FAILED }}" = "true" ]; then
+            echo "❌ **PHPStan**: Failed - PHP static analysis errors found" >> $GITHUB_STEP_SUMMARY
+            FAILED_TESTS="$FAILED_TESTS phpstan"
+            FAILED_DETAILS="$FAILED_DETAILS\n• PHPStan: PHP static analysis errors found"
+          else
+            echo "✅ **PHPStan**: Passed" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          if [ "${{ env.ESLINT_FAILED }}" = "true" ]; then
+            echo "❌ **ESLint**: Failed - JavaScript/Vue linting errors found" >> $GITHUB_STEP_SUMMARY
+            FAILED_TESTS="$FAILED_TESTS eslint"
+            FAILED_DETAILS="$FAILED_DETAILS\n• ESLint: JavaScript/Vue linting errors found"
+          else
+            echo "✅ **ESLint**: Passed" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          if [ "${{ env.STYLELINT_FAILED }}" = "true" ]; then
+            echo "❌ **Stylelint**: Failed - CSS/SCSS linting errors found" >> $GITHUB_STEP_SUMMARY
+            FAILED_TESTS="$FAILED_TESTS stylelint"
+            FAILED_DETAILS="$FAILED_DETAILS\n• Stylelint: CSS/SCSS linting errors found"
+          else
+            echo "✅ **Stylelint**: Passed" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          # Save results for Teams notification
+          echo "FAILED_TESTS=$FAILED_TESTS" >> $GITHUB_ENV
+          echo "FAILED_DETAILS<<EOF" >> $GITHUB_ENV
+          echo -e "$FAILED_DETAILS" >> $GITHUB_ENV
+          echo "EOF" >> $GITHUB_ENV
+          
+          # Final result
+          if [ -n "$FAILED_TESTS" ]; then
+            echo "🔴 **Overall Result**: FAILED" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "**Failed tests:**$FAILED_TESTS" >> $GITHUB_STEP_SUMMARY
+            echo "Please fix the above issues and try again." >> $GITHUB_STEP_SUMMARY
+            echo "OVERALL_FAILED=true" >> $GITHUB_ENV
+          else
+            echo "🟢 **Overall Result**: ALL TESTS PASSED" >> $GITHUB_STEP_SUMMARY
+            echo "OVERALL_FAILED=false" >> $GITHUB_ENV
+          fi
+
       - name: Fetch secrets from Vault for testing
         id: fetch_secrets
-        if: failure()
+        if: always()
         uses: hashicorp/vault-action@v2.7.4
         with:
           url: ${{ vars.VAULT_SERVER }}
@@ -100,12 +317,223 @@ jobs:
           secrets: |
             deployment/data/store/sw6 ms_teams_webhook_uri | MS_TEAMS_WEBHOOK_URI
 
-      - name: Notify teams on failure
-        if: failure()
-        uses: jdcargile/ms-teams-notification@v1.4
-        with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          ms-teams-webhook-uri: ${{ env.MS_TEAMS_WEBHOOK_URI }}
-          notification-summary: 'Tests failed!'
-          notification-color: 'F85149'  # Red 
-          timezone: Europe/Berlin
+      - name: Send Teams notification with custom content
+        if: always()
+        run: |
+          # Export environment variables for Python
+          export TEAMS_USER_MAPPING="${{ vars.TEAMS_USER_MAPPING }}"
+          export COMPOSER_CHECK_FAILED="${{ env.COMPOSER_CHECK_FAILED }}"
+          export README_CHECK_FAILED="${{ env.README_CHECK_FAILED }}"
+          export PHPSTAN_FAILED="${{ env.PHPSTAN_FAILED }}"
+          export ESLINT_FAILED="${{ env.ESLINT_FAILED }}"
+          export STYLELINT_FAILED="${{ env.STYLELINT_FAILED }}"
+          export OVERALL_FAILED="${{ env.OVERALL_FAILED }}"
+          
+          # Determine the author to notify
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            # For PRs, use the PR author
+            AUTHOR_USERNAME="${{ github.event.pull_request.user.login }}"
+          else
+            # For direct pushes, use the commit author
+            AUTHOR_USERNAME="${{ github.actor }}"
+          fi
+          
+          echo "📧 Will notify author: $AUTHOR_USERNAME"
+          export NOTIFY_USER="$AUTHOR_USERNAME"
+          
+          # Create Teams notification with Python
+          python3 << 'PYTHON_EOF'
+          import json
+          import os
+          
+          # Parse user mapping from organization variable
+          # Expected format: "github_user1:email1:displayname1,github_user2:email2:displayname2"
+          email_map = {}
+          display_name_map = {}
+          user_mapping = os.environ.get('TEAMS_USER_MAPPING', '')
+          if user_mapping:
+              for entry in user_mapping.split(','):
+                  parts = entry.split(':')
+                  if len(parts) == 3:
+                      github_user, email, display_name = [p.strip() for p in parts]
+                      email_map[github_user] = email
+                      display_name_map[github_user] = display_name
+                      print(f"Mapped: {github_user} -> {email} ({display_name})")
+                  elif len(parts) == 2:
+                      # Backwards compatibility: github_user:email
+                      github_user, email = [p.strip() for p in parts]
+                      email_map[github_user] = email
+                      display_name_map[github_user] = email.split('@')[0].replace('.', ' ').title()
+                      print(f"Mapped (legacy): {github_user} -> {email}")
+          
+          # Get the user to notify
+          notify_user = os.environ.get('NOTIFY_USER', '')
+          user_email = email_map.get(notify_user, '')
+          user_display_name = display_name_map.get(notify_user, '')
+          
+          print(f"Debug: notify_user={notify_user}, user_email={user_email}, display_name={user_display_name}")
+          
+          # Create test results as individual lines
+          message_parts = []
+          
+          if os.environ.get('COMPOSER_CHECK_FAILED', 'false') == 'true':
+              message_parts.append("❌ **Composer Version Check**: Failed - Please update composer version")
+          else:
+              message_parts.append("✅ **Composer Version Check**: Passed")
+          
+          message_parts.append("")
+          
+          if os.environ.get('README_CHECK_FAILED', 'false') == 'true':
+              message_parts.append("❌ **README Check**: Failed - Please update README with version info")
+          else:
+              message_parts.append("✅ **README Check**: Passed")
+          
+          message_parts.append("")
+          
+          if os.environ.get('PHPSTAN_FAILED', 'false') == 'true':
+              message_parts.append("❌ **PHPStan**: Failed - PHP static analysis errors found")
+          else:
+              message_parts.append("✅ **PHPStan**: Passed")
+          
+          message_parts.append("")
+          
+          if os.environ.get('ESLINT_FAILED', 'false') == 'true':
+              message_parts.append("❌ **ESLint**: Failed - JavaScript/Vue linting errors found")
+          else:
+              message_parts.append("✅ **ESLint**: Passed")
+          
+          message_parts.append("")
+          
+          if os.environ.get('STYLELINT_FAILED', 'false') == 'true':
+              message_parts.append("❌ **Stylelint**: Failed - CSS/SCSS linting errors found")
+          else:
+              message_parts.append("✅ **Stylelint**: Passed")
+          
+          # Add empty line before overall result
+          message_parts.append("")
+          
+          # Determine overall status
+          if os.environ.get('OVERALL_FAILED', 'false') == 'true':
+              message_parts.append("🔴 **Overall Result**: FAILED")
+              message_parts.append("")
+              message_parts.append("Please fix the above issues and try again.")
+              color = "F85149"  # Red
+              summary = "Pipeline Failed ❌"
+          else:
+              message_parts.append("🟢 **Overall Result**: ALL TESTS PASSED")
+              message_parts.append("")
+              message_parts.append("Great job! All linting and validation checks passed successfully.")
+              color = "28A745"  # Green
+              summary = "Pipeline Passed ✅"
+          
+          # Add mention if we have a mapping
+          if notify_user and user_email and user_display_name:
+              message_parts.append("")
+              message_parts.append(f"<at>{user_display_name}</at>")
+          
+          # Join with actual newlines
+          message_text = "\n".join(message_parts)
+          
+          # Get short SHA
+          github_sha = "${{ github.sha }}"
+          short_sha = github_sha[:7]
+          
+          # Create Adaptive Card payload (required for mentions in webhooks)
+          payload = {
+              "type": "message",
+              "attachments": [
+                  {
+                      "contentType": "application/vnd.microsoft.card.adaptive",
+                      "content": {
+                          "type": "AdaptiveCard",
+                          "$schema": "http://adaptivecards.io/schemas/adaptive-card.json",
+                          "version": "1.3",
+                          "body": [
+                              {
+                                  "type": "TextBlock",
+                                  "text": "Shopware Plugin Test Results",
+                                  "weight": "Bolder",
+                                  "size": "Large"
+                              },
+                              {
+                                  "type": "TextBlock",
+                                  "text": "${{ github.repository }}",
+                                  "spacing": "None",
+                                  "isSubtle": True
+                              },
+                              {
+                                  "type": "FactSet",
+                                  "facts": [
+                                      {
+                                          "title": "Branch:",
+                                          "value": "${{ github.ref_name }}"
+                                      },
+                                      {
+                                          "title": "Commit:",
+                                          "value": f"[{short_sha}](${{ github.server_url }}/${{ github.repository }}/commit/{github_sha})"
+                                      },
+                                      {
+                                          "title": "Workflow:",
+                                          "value": "[Run #${{ github.run_number }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})"
+                                      }
+                                  ],
+                                  "separator": True
+                              },
+                              {
+                                  "type": "TextBlock",
+                                  "text": message_text,
+                                  "wrap": True,
+                                  "separator": True
+                              }
+                          ],
+                          "actions": [
+                              {
+                                  "type": "Action.OpenUrl",
+                                  "title": "View Workflow Run",
+                                  "url": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+                              }
+                          ],
+                          "msteams": {
+                              "width": "Full"
+                          }
+                      }
+                  }
+              ]
+          }
+          
+          # Add msteams entities for mention if we have email mapping
+          if notify_user and user_email and user_display_name:
+              payload["attachments"][0]["content"]["msteams"]["entities"] = [
+                  {
+                      "type": "mention",
+                      "text": f"<at>{user_display_name}</at>",
+                      "mentioned": {
+                          "id": user_email,
+                          "name": user_display_name
+                      }
+                  }
+              ]
+          
+          # Save JSON payload
+          with open('teams-payload.json', 'w') as f:
+              json.dump(payload, f, indent=2)
+          
+          print(f"Created Teams notification - will mention: {notify_user} ({user_email}) as '{user_display_name}'" if user_email else f"No mapping found for {notify_user}")
+          PYTHON_EOF
+          
+          # Debug: Show final payload
+          echo "=== Final Teams Payload ==="
+          cat teams-payload.json
+          
+          # Send to Teams webhook
+          curl -X POST \
+            -H "Content-Type: application/json" \
+            -d @teams-payload.json \
+            "${{ env.MS_TEAMS_WEBHOOK_URI }}"
+
+
+      - name: Fail job if any tests failed
+        if: env.OVERALL_FAILED == 'true'
+        run: |
+          echo "❌ One or more tests failed. Check the summary above for details."
+          exit 1
