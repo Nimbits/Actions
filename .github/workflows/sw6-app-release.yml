@@ -1,0 +1,71 @@
+name: 'Build Shopware Store Zip and attach to Release'
+on:
+  workflow_call:
+    inputs:
+      repo_name:
+        required: false
+        type: 'string'
+        default: ${{ github.event.repository.name }}
+    secrets:
+      CURR_VAULT_PATH:
+        required: true
+      CURR_VAULT_TOKEN:
+        required: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+          ref: ${{ github.ref }}
+
+      - name: Prepare and Zip
+        run: |
+          mkdir -p "${{ inputs.repo_name }}"
+      
+          mv src "${{ inputs.repo_name }}/"
+
+          # Delete js folder and files to prevent leaking JavaScript code
+          #rm -rf "${{ inputs.repo_name }}/src/Resources/app/storefront/src/js"
+          #rm -f "${{ inputs.repo_name }}/src/Resources/app/storefront/src/main.js"
+
+          # Delete Administration (Erlebniswelten) files
+          #rm -rf "${{ inputs.repo_name }}/src/Resources/app/administration/src"
+          
+          # Find and delete all other files and directories at the root, except for the ${{ inputs.repo_name }} directory
+          find . -mindepth 1 ! -regex "^./${{ inputs.repo_name }}\(/.*\)?$" -delete
+          zip -r "/tmp/${{ inputs.repo_name }}-${{ github.ref_name }}.zip" "${{ inputs.repo_name }}"
+
+
+      - name: Upload binaries to release
+        uses: svenstaro/upload-release-action@2.7.0
+        with:
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          file: /tmp/${{ inputs.repo_name }}-${{ github.ref_name }}.zip
+          asset_name: ${{ inputs.repo_name }}.zip
+          tag: ${{ github.ref_name }}
+          overwrite: false
+
+      - name: Fetch secrets from Vault for testing
+        id: fetch_secrets
+        if: failure()
+        uses: hashicorp/vault-action@v2.7.4
+        with:
+          url: ${{ vars.VAULT_SERVER }}
+          method: token
+          token: ${{ secrets.CURR_VAULT_TOKEN }}
+          secrets: |
+            ${{ secrets.CURR_VAULT_PATH }} ms_teams_webhook_uri | MS_TEAMS_WEBHOOK_URI
+
+      - name: Notify teams on failure
+        if: failure()
+        uses: jdcargile/ms-teams-notification@v1.4
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          ms-teams-webhook-uri: ${{ env.MS_TEAMS_WEBHOOK_URI }}
+          notification-summary: 'Release failed!'
+          notification-color: 'F85149'  # Red 
+          timezone: Europe/Berlin
