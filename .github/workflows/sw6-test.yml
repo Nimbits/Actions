@@ -177,7 +177,7 @@ jobs:
           tag_name: pr-${{ github.event.pull_request.number }}-${{ github.run_number }}
           name: "PR #${{ github.event.pull_request.number }} - Build ${{ github.run_number }}"
           draft: true
-          token: '${{ secrets.GITHUB_TOKEN }}'
+          token: '${{ secrets.DEPLOY_TOKEN }}'
           prerelease: true
           files: /tmp/${{ env.REPO_NAME }}-${{ env.VERSION }}.zip
           body: |
