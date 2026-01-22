@@ -136,7 +136,7 @@ jobs:
           fetch-depth: 0
           ref: ${{ github.ref }}
           # Use DEPLOY_TOKEN for checkout if needed
-          token: ${{ secrets.DEPLOY_TOKEN }}
+          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Get plugin info
         id: plugin_info
@@ -186,7 +186,7 @@ jobs:
           tag_name: pr-${{ github.event.pull_request.number }}-${{ github.run_number }}
           name: "PR #${{ github.event.pull_request.number }} - Build ${{ github.run_number }}"
           draft: true
-          token: ${{ secrets.DEPLOY_TOKEN }}
+          token: ${{ secrets.GITHUB_TOKEN }}
           prerelease: true
           files: /tmp/${{ env.REPO_NAME }}-${{ env.VERSION }}.zip
           body: |
@@ -200,7 +200,7 @@ jobs:
         if: github.event_name == 'pull_request'
         uses: actions/github-script@v7
         with:
-          github-token: ${{ secrets.DEPLOY_TOKEN }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
             const repoName = process.env.REPO_NAME;
             const version = process.env.VERSION;
@@ -257,7 +257,7 @@ jobs:
         if: github.event_name == 'pull_request'
         uses: actions/github-script@v7
         with:
-          github-token: ${{ secrets.DEPLOY_TOKEN }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
             const prNumber = context.issue.number;
             const { data: releases } = await github.rest.repos.listReleases({
