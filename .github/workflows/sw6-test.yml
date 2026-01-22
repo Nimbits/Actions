@@ -119,6 +119,10 @@ jobs:
 
   attach-shopware-release:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+      packages: write
     secrets: inherit
     needs: test
     if: always()  # Run even if tests fail
