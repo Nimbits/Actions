@@ -31,6 +31,86 @@ on:
         required: true
 
 jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4.1.1
+
+      - name: Determine Base Branch
+        id: basebranch
+        run: |
+          if [[ "${{ github.event_name }}" == "release" ]]; then
+            echo "branch=$(git ls-remote --heads origin master | grep -q master && echo master || echo main)" >> $GITHUB_ENV
+          else
+            echo "branch=$(git ls-remote --heads origin master | grep -q master && echo master || (git ls-remote --heads origin main | grep -q main && echo main))" >> $GITHUB_ENV
+          fi
+
+      - name: Check composer version
+        if: github.event_name != 'release'
+        run: |
+          git fetch origin ${{ env.branch }}:${{ env.branch }}
+          BASE_VERSION=$(jq -r '.version' composer.json -c)
+          git checkout ${{ env.branch }}
+          CURRENT_VERSION=$(jq -r '.version' composer.json -c)
+          git checkout -
+          if [ "$GITHUB_REF_NAME" != "${{ env.branch }}" ] && [ "$BASE_VERSION" == "$CURRENT_VERSION" ]; then
+            echo "Please change the composer version"
+            exit 1
+          fi
+
+      - name: Check for README changes
+        if: github.event_name != 'release'
+        run: |
+          git fetch origin ${{ env.branch }}
+          if ! git diff --name-only HEAD origin/${{ env.branch }} | grep -q "README"; then
+            echo "Please add the version to the readme"
+            exit 1
+          fi
+
+      - name: Configure GitHub token #needed for vcs dependencies
+        run: composer config --global --auth github-oauth.github.com ${{ secrets.DEPENDENCY_TOKEN }}
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          github-token: ${{ secrets.DEPENDENCY_TOKEN }}
+          php-version: ${{ inputs.php-version }}
+          tools: composer:${{ inputs.composer-version }}
+
+      - name: Install dependencies
+        run: |
+          composer install
+
+      - name: PHPStan
+        uses: php-actions/phpstan@v3
+        with:
+          version: composer
+          path: src/
+          level: ${{ inputs.phpstan-level }}
+          php_version: ${{ inputs.php-version }}
+
+      - name: Fetch secrets from Vault for testing
+        id: fetch_secrets
+        if: failure()
+        uses: hashicorp/vault-action@v2.7.4
+        with:
+          url: ${{ vars.VAULT_SERVER }}
+          method: token
+          token: ${{ secrets.CURR_VAULT_TOKEN }}
+          secrets: |
+            deployment/data/store/sw6 ms_teams_webhook_uri | MS_TEAMS_WEBHOOK_URI
+
+      - name: Notify teams on failure
+        if: failure()
+        uses: jdcargile/ms-teams-notification@v1.4
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          ms-teams-webhook-uri: ${{ env.MS_TEAMS_WEBHOOK_URI }}
+          notification-summary: 'Tests failed!'
+          notification-color: 'F85149'  # Red
+          timezone: Europe/Berlin
 
   attach-shopware-release:
     runs-on: ubuntu-latest
@@ -74,6 +154,7 @@ jobs:
           # Find and delete all other files and directories at the root, except for the plugin directory
           find . -mindepth 1 ! -regex "^./${{ env.REPO_NAME }}\(/.*\)?$" -delete
           zip -r "/tmp/${{ env.REPO_NAME }}-${{ env.VERSION }}.zip" "${{ env.REPO_NAME }}"
+
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
@@ -82,195 +163,114 @@ jobs:
           compression-level: 0
           retention-days: 30
 
-  - name: Create draft release for PR
-    if: github.event_name == 'pull_request'
-    id: create_release
-    uses: softprops/action-gh-release@v1
-    with:
-      tag_name: pr-${{ github.event.pull_request.number }}-${{ github.run_number }}
-      name: "PR #${{ github.event.pull_request.number }} - Build ${{ github.run_number }}"
-      draft: true
-      prerelease: true
-      files: ${{ env.REPO_NAME }}-${{ env.VERSION }}.zip
-      body: |
-        Automated build for PR #${{ github.event.pull_request.number }}
-        
-        **Branch:** ${{ github.head_ref }}
-        **Commit:** ${{ github.sha }}
-        **Tests:** ${{ needs.test.result }}
-    env:
-      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-  - name: Comment on PR with download link
-    if: github.event_name == 'pull_request'
-    uses: actions/github-script@v7
-    with:
-      github-token: ${{ secrets.GITHUB_TOKEN }}
-      script: |
-        const repoName = process.env.REPO_NAME;
-        const version = process.env.VERSION;
-        const repo = context.repo;
-        const testsPassed = '${{ needs.test.result }}' === 'success';
-        const releaseUrl = '${{ steps.create_release.outputs.url }}';
-        
-        const statusEmoji = testsPassed ? '✅' : '⚠️';
-        const statusText = testsPassed ? 'Tests Passed' : 'Tests Failed';
-        
-        const commentBody = `## ${statusEmoji} Plugin Package Ready (${statusText})
-        
-        **Plugin:** \`${repoName}\`
-        **Version:** \`${version}\`
-        **Package:** \`${repoName}-${version}.zip\`
-        **Tests:** ${testsPassed ? '✅ Passed' : '❌ Failed'}
-        
-        📦 [Download Plugin Package](${releaseUrl})
-        
-        *The zip file is attached to the draft release. Click the link above to download.*
-        ${testsPassed ? '' : '\n⚠️ **Warning:** This package was built despite test failures. Use with caution.'}`;
-        
-        // Find existing comment
-        const comments = await github.rest.issues.listComments({
-          issue_number: context.issue.number,
-          owner: repo.owner,
-          repo: repo.repo,
-        });
-        
-        const botComment = comments.data.find(comment => 
-          comment.user.type === 'Bot' && 
-          comment.body.includes('Plugin Package Ready')
-        );
-        
-        if (botComment) {
-          // Update existing comment
-          await github.rest.issues.updateComment({
-            comment_id: botComment.id,
-            owner: repo.owner,
-            repo: repo.repo,
-            body: commentBody
-          });
-        } else {
-          // Create new comment
-          await github.rest.issues.createComment({
-            issue_number: context.issue.number,
-            owner: repo.owner,
-            repo: repo.repo,
-            body: commentBody
-          });
-        }
-  - name: Delete old PR draft releases
-    if: github.event_name == 'pull_request'
-    uses: actions/github-script@v7
-    with:
-      github-token: ${{ secrets.GITHUB_TOKEN }}
-      script: |
-        const prNumber = context.issue.number;
-        const { data: releases } = await github.rest.repos.listReleases({
-          owner: context.repo.owner,
-          repo: context.repo.repo,
-        });
-        
-        // Find and delete old draft releases for this PR
-        for (const release of releases) {
-          if (release.draft && 
-              release.tag_name.startsWith(`pr-${prNumber}-`) &&
-              release.id !== parseInt('${{ steps.create_release.outputs.id }}')) {
-            await github.rest.repos.deleteRelease({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              release_id: release.id,
-            });
-        
-            // Also delete the tag
-            try {
-              await github.rest.git.deleteRef({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                ref: `tags/${release.tag_name}`,
-              });
-            } catch (error) {
-              console.log(`Could not delete tag ${release.tag_name}`);
-            }
-          }
-        }
-  test:
-    runs-on: ubuntu-latest
-    
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4.1.1
-
-      - name: Determine Base Branch
-        id: basebranch
-        run: |
-          if [[ "${{ github.event_name }}" == "release" ]]; then
-            echo "branch=$(git ls-remote --heads origin master | grep -q master && echo master || echo main)" >> $GITHUB_ENV
-          else
-            echo "branch=$(git ls-remote --heads origin master | grep -q master && echo master || (git ls-remote --heads origin main | grep -q main && echo main))" >> $GITHUB_ENV
-          fi
-  
-      - name: Check composer version
-        if: github.event_name != 'release'
-        run: |
-          git fetch origin ${{ env.branch }}:${{ env.branch }}
-          BASE_VERSION=$(jq -r '.version' composer.json -c)
-          git checkout ${{ env.branch }}
-          CURRENT_VERSION=$(jq -r '.version' composer.json -c)
-          git checkout -
-          if [ "$GITHUB_REF_NAME" != "${{ env.branch }}" ] && [ "$BASE_VERSION" == "$CURRENT_VERSION" ]; then
-            echo "Please change the composer version"
-            exit 1
-          fi
-
-      
-      - name: Check for README changes
-        if: github.event_name != 'release'
-        run: |
-          git fetch origin ${{ env.branch }}
-          if ! git diff --name-only HEAD origin/${{ env.branch }} | grep -q "README"; then
-            echo "Please add the version to the readme"
-            exit 1
-          fi
-
-
-      - name: Configure GitHub token #needed for vcs dependencies
-        run: composer config --global --auth github-oauth.github.com ${{ secrets.DEPENDENCY_TOKEN }}
-
-      - name: Setup PHP
-        uses: shivammathur/setup-php@v2
+      - name: Create draft release for PR
+        if: github.event_name == 'pull_request'
+        id: create_release
+        uses: softprops/action-gh-release@v1
         with:
-          github-token: ${{ secrets.DEPENDENCY_TOKEN }}
-          php-version: ${{ inputs.php-version }}
-          tools: composer:${{ inputs.composer-version }}
+          tag_name: pr-${{ github.event.pull_request.number }}-${{ github.run_number }}
+          name: "PR #${{ github.event.pull_request.number }} - Build ${{ github.run_number }}"
+          draft: true
+          prerelease: true
+          files: /tmp/${{ env.REPO_NAME }}-${{ env.VERSION }}.zip
+          body: |
+            Automated build for PR #${{ github.event.pull_request.number }}
+            
+            **Branch:** ${{ github.head_ref }}
+            **Commit:** ${{ github.sha }}
+            **Tests:** ${{ needs.test.result }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Install dependencies
-        run: |
-          composer install
-
-      - name: PHPStan
-        uses: php-actions/phpstan@v3
-        with:
-          version: composer
-          path: src/
-          level: ${{ inputs.phpstan-level }}
-          php_version: ${{ inputs.php-version }}
-
-      - name: Fetch secrets from Vault for testing
-        id: fetch_secrets
-        if: failure()
-        uses: hashicorp/vault-action@v2.7.4
-        with:
-          url: ${{ vars.VAULT_SERVER }}
-          method: token
-          token: ${{ secrets.CURR_VAULT_TOKEN }}
-          secrets: |
-            deployment/data/store/sw6 ms_teams_webhook_uri | MS_TEAMS_WEBHOOK_URI
-
-      - name: Notify teams on failure
-        if: failure()
-        uses: jdcargile/ms-teams-notification@v1.4
+      - name: Comment on PR with download link
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
-          ms-teams-webhook-uri: ${{ env.MS_TEAMS_WEBHOOK_URI }}
-          notification-summary: 'Tests failed!'
-          notification-color: 'F85149'  # Red 
-          timezone: Europe/Berlin
+          script: |
+            const repoName = process.env.REPO_NAME;
+            const version = process.env.VERSION;
+            const repo = context.repo;
+            const testsPassed = '${{ needs.test.result }}' === 'success';
+            const releaseUrl = '${{ steps.create_release.outputs.url }}';
+            
+            const statusEmoji = testsPassed ? '✅' : '⚠️';
+            const statusText = testsPassed ? 'Tests Passed' : 'Tests Failed';
+            
+            const commentBody = `## ${statusEmoji} Plugin Package Ready (${statusText})
+            
+            **Plugin:** \`${repoName}\`
+            **Version:** \`${version}\`
+            **Package:** \`${repoName}-${version}.zip\`
+            **Tests:** ${testsPassed ? '✅ Passed' : '❌ Failed'}
+            
+            📦 [Download Plugin Package](${releaseUrl})
+            
+            *The zip file is attached to the draft release. Click the link above to download.*
+            ${testsPassed ? '' : '\n⚠️ **Warning:** This package was built despite test failures. Use with caution.'}`;
+            
+            // Find existing comment
+            const comments = await github.rest.issues.listComments({
+              issue_number: context.issue.number,
+              owner: repo.owner,
+              repo: repo.repo,
+            });
+            
+            const botComment = comments.data.find(comment => 
+              comment.user.type === 'Bot' && 
+              comment.body.includes('Plugin Package Ready')
+            );
+            
+            if (botComment) {
+              // Update existing comment
+              await github.rest.issues.updateComment({
+                comment_id: botComment.id,
+                owner: repo.owner,
+                repo: repo.repo,
+                body: commentBody
+              });
+            } else {
+              // Create new comment
+              await github.rest.issues.createComment({
+                issue_number: context.issue.number,
+                owner: repo.owner,
+                repo: repo.repo,
+                body: commentBody
+              });
+            }
+
+      - name: Delete old PR draft releases
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const prNumber = context.issue.number;
+            const { data: releases } = await github.rest.repos.listReleases({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+            });
+            
+            // Find and delete old draft releases for this PR
+            for (const release of releases) {
+              if (release.draft && 
+                  release.tag_name.startsWith(`pr-${prNumber}-`) &&
+                  release.id !== parseInt('${{ steps.create_release.outputs.id }}')) {
+                await github.rest.repos.deleteRelease({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  release_id: release.id,
+                });
+            
+                // Also delete the tag
+                try {
+                  await github.rest.git.deleteRef({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    ref: `tags/${release.tag_name}`,
+                  });
+                } catch (error) {
+                  console.log(`Could not delete tag ${release.tag_name}`);
+                }
+              }
+            }
