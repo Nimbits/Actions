@@ -73,13 +73,13 @@ jobs:
           
           # Find and delete all other files and directories at the root, except for the plugin directory
           find . -mindepth 1 ! -regex "^./${{ env.REPO_NAME }}\(/.*\)?$" -delete
-          zip -r "${{ env.REPO_NAME }}-${{ env.VERSION }}.zip" "${{ env.REPO_NAME }}"
+          zip -r "/tmp/${{ env.REPO_NAME }}-${{ env.VERSION }}.zip" "${{ env.REPO_NAME }}"
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: ${{ env.REPO_NAME }}-${{ env.VERSION }}
-          path: "${{ env.REPO_NAME }}-*.zip"
+          path: "/tmp/${{ env.REPO_NAME }}-*.zip"
           retention-days: 30
 
       - name: Comment on PR with download link
