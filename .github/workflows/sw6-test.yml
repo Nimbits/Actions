@@ -82,63 +82,116 @@ jobs:
           compression-level: 0
           retention-days: 30
 
-      - name: Comment on PR with download link
-        if: github.event_name == 'pull_request'
-        uses: actions/github-script@v7
-        with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          script: |
-            const repoName = process.env.REPO_NAME;
-            const version = process.env.VERSION;
-            const runId = context.runId;
-            const repo = context.repo;
-            const testsPassed = '${{ needs.test.result }}' === 'success';
-            
-            const statusEmoji = testsPassed ? '✅' : '⚠️';
-            const statusText = testsPassed ? 'Tests Passed' : 'Tests Failed';
-            
-            const commentBody = `## ${statusEmoji} Plugin Package Ready (${statusText})
-            
-            **Plugin:** \`${repoName}\`
-            **Version:** \`${version}\`
-            **Package:** \`${repoName}-${version}.zip\`
-            **Tests:** ${testsPassed ? '✅ Passed' : '❌ Failed'}
-            
-            📦 [Download Plugin Package](https://github.com/${repo.owner}/${repo.repo}/actions/runs/${runId})
-            
-            *Click the link above and scroll to "Artifacts" section to download the zip file.*
-            ${testsPassed ? '' : '\n⚠️ **Warning:** This package was built despite test failures. Use with caution.'}`;
-            
-            // Find existing comment
-            const comments = await github.rest.issues.listComments({
-              issue_number: context.issue.number,
-              owner: repo.owner,
-              repo: repo.repo,
+  - name: Create draft release for PR
+    if: github.event_name == 'pull_request'
+    id: create_release
+    uses: softprops/action-gh-release@v1
+    with:
+      tag_name: pr-${{ github.event.pull_request.number }}-${{ github.run_number }}
+      name: "PR #${{ github.event.pull_request.number }} - Build ${{ github.run_number }}"
+      draft: true
+      prerelease: true
+      files: ${{ env.REPO_NAME }}-${{ env.VERSION }}.zip
+      body: |
+        Automated build for PR #${{ github.event.pull_request.number }}
+        
+        **Branch:** ${{ github.head_ref }}
+        **Commit:** ${{ github.sha }}
+        **Tests:** ${{ needs.test.result }}
+    env:
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  - name: Comment on PR with download link
+    if: github.event_name == 'pull_request'
+    uses: actions/github-script@v7
+    with:
+      github-token: ${{ secrets.GITHUB_TOKEN }}
+      script: |
+        const repoName = process.env.REPO_NAME;
+        const version = process.env.VERSION;
+        const repo = context.repo;
+        const testsPassed = '${{ needs.test.result }}' === 'success';
+        const releaseUrl = '${{ steps.create_release.outputs.url }}';
+        
+        const statusEmoji = testsPassed ? '✅' : '⚠️';
+        const statusText = testsPassed ? 'Tests Passed' : 'Tests Failed';
+        
+        const commentBody = `## ${statusEmoji} Plugin Package Ready (${statusText})
+        
+        **Plugin:** \`${repoName}\`
+        **Version:** \`${version}\`
+        **Package:** \`${repoName}-${version}.zip\`
+        **Tests:** ${testsPassed ? '✅ Passed' : '❌ Failed'}
+        
+        📦 [Download Plugin Package](${releaseUrl})
+        
+        *The zip file is attached to the draft release. Click the link above to download.*
+        ${testsPassed ? '' : '\n⚠️ **Warning:** This package was built despite test failures. Use with caution.'}`;
+        
+        // Find existing comment
+        const comments = await github.rest.issues.listComments({
+          issue_number: context.issue.number,
+          owner: repo.owner,
+          repo: repo.repo,
+        });
+        
+        const botComment = comments.data.find(comment => 
+          comment.user.type === 'Bot' && 
+          comment.body.includes('Plugin Package Ready')
+        );
+        
+        if (botComment) {
+          // Update existing comment
+          await github.rest.issues.updateComment({
+            comment_id: botComment.id,
+            owner: repo.owner,
+            repo: repo.repo,
+            body: commentBody
+          });
+        } else {
+          // Create new comment
+          await github.rest.issues.createComment({
+            issue_number: context.issue.number,
+            owner: repo.owner,
+            repo: repo.repo,
+            body: commentBody
+          });
+        }
+  - name: Delete old PR draft releases
+    if: github.event_name == 'pull_request'
+    uses: actions/github-script@v7
+    with:
+      github-token: ${{ secrets.GITHUB_TOKEN }}
+      script: |
+        const prNumber = context.issue.number;
+        const { data: releases } = await github.rest.repos.listReleases({
+          owner: context.repo.owner,
+          repo: context.repo.repo,
+        });
+        
+        // Find and delete old draft releases for this PR
+        for (const release of releases) {
+          if (release.draft && 
+              release.tag_name.startsWith(`pr-${prNumber}-`) &&
+              release.id !== parseInt('${{ steps.create_release.outputs.id }}')) {
+            await github.rest.repos.deleteRelease({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              release_id: release.id,
             });
-            
-            const botComment = comments.data.find(comment => 
-              comment.user.type === 'Bot' && 
-              comment.body.includes('Plugin Package Ready')
-            );
-            
-            if (botComment) {
-              // Update existing comment
-              await github.rest.issues.updateComment({
-                comment_id: botComment.id,
-                owner: repo.owner,
-                repo: repo.repo,
-                body: commentBody
+        
+            // Also delete the tag
+            try {
+              await github.rest.git.deleteRef({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                ref: `tags/${release.tag_name}`,
               });
-            } else {
-              // Create new comment
-              await github.rest.issues.createComment({
-                issue_number: context.issue.number,
-                owner: repo.owner,
-                repo: repo.repo,
-                body: commentBody
-              });
+            } catch (error) {
+              console.log(`Could not delete tag ${release.tag_name}`);
             }
-            
+          }
+        }
   test:
     runs-on: ubuntu-latest
     
