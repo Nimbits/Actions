@@ -135,8 +135,6 @@ jobs:
         with:
           fetch-depth: 0
           ref: ${{ github.ref }}
-          # Use DEPLOY_TOKEN for checkout if needed
-          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Get plugin info
         id: plugin_info
