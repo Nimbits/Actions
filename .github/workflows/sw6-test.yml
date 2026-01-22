@@ -178,7 +178,6 @@ jobs:
           name: "PR #${{ github.event.pull_request.number }} - Build ${{ github.run_number }}"
           draft: true
           prerelease: true
-          token: '${{ secrets.DEPENDENCY_TOKEN }}'
           files: /tmp/${{ env.REPO_NAME }}-${{ env.VERSION }}.zip
           body: |
             Automated build for PR #${{ github.event.pull_request.number }}
