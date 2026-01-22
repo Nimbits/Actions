@@ -182,8 +182,7 @@ jobs:
             **Branch:** ${{ github.head_ref }}
             **Commit:** ${{ github.sha }}
             **Tests:** ${{ needs.test.result }}
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
 
       - name: Comment on PR with download link
         if: github.event_name == 'pull_request'
