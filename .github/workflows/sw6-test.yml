@@ -114,6 +114,9 @@ jobs:
 
   attach-shopware-release:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write  # Required for creating releases
+      pull-requests: write  # Required for commenting on PRs
     needs: test
     if: always()  # Run even if tests fail
     steps:
