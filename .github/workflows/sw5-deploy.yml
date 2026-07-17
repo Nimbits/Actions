@@ -49,7 +49,7 @@ jobs:
 
     - name: Remove unnecessary files
       run: |
-        rm -rf README.md .git* .eslint* .env* .prettier* .husky commitlint.config.js || true
+        sudo rm -rf README.md .git* .eslint* .env* .prettier* .husky commitlint.config.js || true
 
     - name: Prepare and Zip
       run: |
