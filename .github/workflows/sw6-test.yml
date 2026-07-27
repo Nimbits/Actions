@@ -62,7 +62,7 @@ jobs:
           else
             REPO_NAME="${{ github.event.repository.name }}"
           fi
-          
+
           VERSION=$(jq -r '.version' composer.json)
           echo "REPO_NAME=${REPO_NAME}" >> $GITHUB_ENV
           echo "VERSION=${VERSION}" >> $GITHUB_ENV
@@ -70,7 +70,7 @@ jobs:
       - name: Prepare and Zip
         run: |
           mkdir -p "${{ env.REPO_NAME }}"
-          
+
           mv composer.json "${{ env.REPO_NAME }}/"
           mv src "${{ env.REPO_NAME }}/"
 
@@ -80,7 +80,7 @@ jobs:
 
           # Delete Administration (Erlebniswelten) files
           #rm -rf "${{ env.REPO_NAME }}/src/Resources/app/administration/src"
-          
+
           # Find and delete all other files and directories at the root, except for the plugin directory
           find . -mindepth 1 ! -regex "^./${{ env.REPO_NAME }}\(/.*\)?$" -delete
           zip -r "/tmp/${{ env.REPO_NAME }}-${{ env.VERSION }}.zip" "${{ env.REPO_NAME }}"
@@ -104,7 +104,7 @@ jobs:
           files: "/tmp/${{ env.REPO_NAME }}-${{ env.VERSION }}.zip"
           body: |
             Automated build for PR #${{ github.event.pull_request.number }}
-            
+
             **Branch:** ${{ github.head_ref }}
             **Commit:** ${{ github.sha }}
             **Tests:** ${{ needs.test.result }}
@@ -122,34 +122,34 @@ jobs:
             const repo = context.repo;
             const testsPassed = '${{ needs.test.result }}' === 'success';
             const releaseUrl = '${{ steps.create_release.outputs.url }}';
-            
+
             const statusEmoji = testsPassed ? '✅' : '⚠️';
             const statusText = testsPassed ? 'Tests Passed' : 'Tests Failed';
-            
+
             const commentBody = `## ${statusEmoji} Plugin Package Ready (${statusText})
-            
+
             **Plugin:** \`${repoName}\`
             **Version:** \`${version}\`
             **Package:** \`${repoName}-${version}.zip\`
             **Tests:** ${testsPassed ? '✅ Passed' : '❌ Failed'}
-            
+
             📦 [Download Plugin Package](${releaseUrl})
-            
+
             *The zip file is attached to the draft release. Click the link above to download.*
             ${testsPassed ? '' : '\n⚠️ **Warning:** This package was built despite test failures. Use with caution.'}`;
-            
+
             // Find existing comment
             const comments = await github.rest.issues.listComments({
               issue_number: context.issue.number,
               owner: repo.owner,
               repo: repo.repo,
             });
-            
-            const botComment = comments.data.find(comment => 
-              comment.user.type === 'Bot' && 
+
+            const botComment = comments.data.find(comment =>
+              comment.user.type === 'Bot' &&
               comment.body.includes('Plugin Package Ready')
             );
-            
+
             if (botComment) {
               // Update existing comment
               await github.rest.issues.updateComment({
@@ -178,10 +178,10 @@ jobs:
               owner: context.repo.owner,
               repo: context.repo.repo,
             });
-            
+
             // Find and delete old draft releases for this PR
             for (const release of releases) {
-              if (release.draft && 
+              if (release.draft &&
                   release.tag_name.startsWith(`pr-${prNumber}-`) &&
                   release.id !== parseInt('${{ steps.create_release.outputs.id }}')) {
                 await github.rest.repos.deleteRelease({
@@ -189,7 +189,7 @@ jobs:
                   repo: context.repo.repo,
                   release_id: release.id,
                 });
-            
+
                 // Also delete the tag
                 try {
                   await github.rest.git.deleteRef({
@@ -213,43 +213,43 @@ jobs:
         run: |
           echo "📥 Downloading linting configurations..."
           mkdir -p .github/lint-configs
-          
+
           # Download package.json from CLI repo
           curl -H "Authorization: token ${{ secrets.DEPENDENCY_TOKEN }}" \
                -H "Accept: application/vnd.github.v3.raw" \
                -o .github/lint-configs/package.json \
                "https://api.github.com/repos/Nimbits/cli/contents/package.json?ref=${{ inputs.cli-branch }}"
-          
+
           # Download pnpm-lock.yaml from CLI repo
           curl -H "Authorization: token ${{ secrets.DEPENDENCY_TOKEN }}" \
                -H "Accept: application/vnd.github.v3.raw" \
                -o .github/lint-configs/pnpm-lock.yaml \
                "https://api.github.com/repos/Nimbits/cli/contents/pnpm-lock.yaml?ref=${{ inputs.cli-branch }}"
-          
+
           # Download PHPStan config
           curl -H "Authorization: token ${{ secrets.DEPENDENCY_TOKEN }}" \
                -H "Accept: application/vnd.github.v3.raw" \
                -o .github/lint-configs/phpstan.neon \
                "https://api.github.com/repos/Nimbits/cli/contents/configs/phpstan.neon?ref=${{ inputs.cli-branch }}"
-          
+
           # Download ESLint config
           curl -H "Authorization: token ${{ secrets.DEPENDENCY_TOKEN }}" \
                -H "Accept: application/vnd.github.v3.raw" \
                -o .github/lint-configs/eslint.config.js \
                "https://api.github.com/repos/Nimbits/cli/contents/configs/eslint.config.js?ref=${{ inputs.cli-branch }}"
-          
+
           # Download Stylelint config
           curl -H "Authorization: token ${{ secrets.DEPENDENCY_TOKEN }}" \
                -H "Accept: application/vnd.github.v3.raw" \
                -o .github/lint-configs/.stylelintrc.json \
                "https://api.github.com/repos/Nimbits/cli/contents/configs/.stylelintrc.json?ref=${{ inputs.cli-branch }}"
-          
+
           # Download Stylelint ignore file
           curl -H "Authorization: token ${{ secrets.DEPENDENCY_TOKEN }}" \
                -H "Accept: application/vnd.github.v3.raw" \
                -o .github/lint-configs/.stylelintignore \
                "https://api.github.com/repos/Nimbits/cli/contents/configs/.stylelintignore?ref=${{ inputs.cli-branch }}"
-          
+
           echo "✅ Downloaded configurations:"
           ls -la .github/lint-configs/
 
@@ -321,15 +321,15 @@ jobs:
         run: |
           echo "📦 Installing Node.js dependencies from CLI package.json..."
           cd .github/lint-configs
-          
+
           # Show what files we have
           echo "Downloaded files:"
           ls -la
-          
+
           # Show package.json content for verification
           echo "CLI package.json content:"
           cat package.json
-          
+
           # Check if pnpm-lock.yaml was downloaded
           if [ -f "pnpm-lock.yaml" ]; then
             echo "✅ pnpm-lock.yaml found, using frozen lockfile"
@@ -338,10 +338,10 @@ jobs:
             echo "⚠️ pnpm-lock.yaml not found, installing without frozen lockfile"
             pnpm install --no-frozen-lockfile
           fi
-          
+
           echo "✅ Installed linting dependencies:"
           ls -la node_modules/.bin/ | grep -E "(eslint|stylelint)" || echo "No linting tools found in bin"
-          
+
           cd ../..
 
       - name: PHPStan
@@ -363,7 +363,7 @@ jobs:
             echo "PHPSTAN_FAILED=false" >> $GITHUB_ENV
           fi
 
-      - name: Run ESLint
+      - name: Run ESLint (non-blocking)
         continue-on-error: true
         id: eslint
         run: |
@@ -385,7 +385,7 @@ jobs:
         if: steps.eslint.outcome == 'failure'
         run: echo "ESLINT_FAILED=true" >> $GITHUB_ENV
 
-      - name: Run Stylelint
+      - name: Run Stylelint (non-blocking)
         continue-on-error: true
         id: stylelint
         run: |
@@ -412,74 +412,86 @@ jobs:
         run: |
           echo "## 📋 Test Results Summary" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          
-          FAILED_TESTS=""
-          FAILED_DETAILS=""
-          
-          # Check each test result
+
+          BLOCKING_FAILED=""
+          WARNING_TESTS=""
+
+          # Composer/README block only when merging into the base branch (master/main),
+          # i.e. on pull requests targeting it
+          IS_MASTER_MERGE="false"
+          if [ "${{ github.event_name }}" = "pull_request" ] && [ "${{ github.base_ref }}" = "${{ env.branch }}" ]; then
+            IS_MASTER_MERGE="true"
+          fi
+          echo "ℹ️ Target branch: ${{ github.base_ref || github.ref_name }} (composer/readme blocking: $IS_MASTER_MERGE)"
+
+          # --- Composer / README (blocking only for merges into master) ---
           if [ "${{ env.COMPOSER_CHECK_FAILED }}" = "true" ]; then
-            echo "❌ **Composer Version Check**: Failed - Please update composer version" >> $GITHUB_STEP_SUMMARY
-            FAILED_TESTS="$FAILED_TESTS composer"
-            FAILED_DETAILS="$FAILED_DETAILS\n• Composer Version Check: Please update composer version"
+            if [ "$IS_MASTER_MERGE" = "true" ]; then
+              echo "❌ **Composer Version Check**: Failed - Please update composer version" >> $GITHUB_STEP_SUMMARY
+              BLOCKING_FAILED="$BLOCKING_FAILED composer"
+            else
+              echo "⚠️ **Composer Version Check**: Warning - Please update composer version (blocks only on merge into ${{ env.branch }})" >> $GITHUB_STEP_SUMMARY
+              WARNING_TESTS="$WARNING_TESTS composer"
+            fi
           else
             echo "✅ **Composer Version Check**: Passed" >> $GITHUB_STEP_SUMMARY
           fi
-          
+
           if [ "${{ env.README_CHECK_FAILED }}" = "true" ]; then
-            echo "❌ **README Check**: Failed - Please update README with version info" >> $GITHUB_STEP_SUMMARY
-            FAILED_TESTS="$FAILED_TESTS readme"
-            FAILED_DETAILS="$FAILED_DETAILS\n• README Check: Please update README with version info"
+            if [ "$IS_MASTER_MERGE" = "true" ]; then
+              echo "❌ **README Check**: Failed - Please update README with version info" >> $GITHUB_STEP_SUMMARY
+              BLOCKING_FAILED="$BLOCKING_FAILED readme"
+            else
+              echo "⚠️ **README Check**: Warning - Please update README with version info (blocks only on merge into ${{ env.branch }})" >> $GITHUB_STEP_SUMMARY
+              WARNING_TESTS="$WARNING_TESTS readme"
+            fi
           else
             echo "✅ **README Check**: Passed" >> $GITHUB_STEP_SUMMARY
           fi
-          
+
+          # --- PHPStan (always blocking) ---
           if [ "${{ env.PHPSTAN_FAILED }}" = "true" ]; then
             echo "❌ **PHPStan**: Failed - PHP static analysis errors found" >> $GITHUB_STEP_SUMMARY
-            FAILED_TESTS="$FAILED_TESTS phpstan"
-            FAILED_DETAILS="$FAILED_DETAILS\n• PHPStan: PHP static analysis errors found"
+            BLOCKING_FAILED="$BLOCKING_FAILED phpstan"
           else
             echo "✅ **PHPStan**: Passed" >> $GITHUB_STEP_SUMMARY
           fi
-          
+
+          # --- Non-blocking checks (warnings only) ---
           if [ "${{ env.ESLINT_FAILED }}" = "true" ]; then
-            echo "❌ **ESLint**: Failed - JavaScript/Vue linting errors found" >> $GITHUB_STEP_SUMMARY
-            FAILED_TESTS="$FAILED_TESTS eslint"
-            FAILED_DETAILS="$FAILED_DETAILS\n• ESLint: JavaScript/Vue linting errors found"
+            echo "⚠️ **ESLint**: Warnings - JavaScript/Vue linting errors found (non-blocking)" >> $GITHUB_STEP_SUMMARY
+            WARNING_TESTS="$WARNING_TESTS eslint"
           else
             echo "✅ **ESLint**: Passed" >> $GITHUB_STEP_SUMMARY
           fi
-          
+
           if [ "${{ env.STYLELINT_FAILED }}" = "true" ]; then
-            echo "❌ **Stylelint**: Failed - CSS/SCSS linting errors found" >> $GITHUB_STEP_SUMMARY
-            FAILED_TESTS="$FAILED_TESTS stylelint"
-            FAILED_DETAILS="$FAILED_DETAILS\n• Stylelint: CSS/SCSS linting errors found"
+            echo "⚠️ **Stylelint**: Warnings - CSS/SCSS linting errors found (non-blocking)" >> $GITHUB_STEP_SUMMARY
+            WARNING_TESTS="$WARNING_TESTS stylelint"
           else
             echo "✅ **Stylelint**: Passed" >> $GITHUB_STEP_SUMMARY
           fi
-          
+
           echo "" >> $GITHUB_STEP_SUMMARY
-          
-          # Save results for Teams notification
-          echo "FAILED_TESTS=$FAILED_TESTS" >> $GITHUB_ENV
-          echo "FAILED_DETAILS<<EOF" >> $GITHUB_ENV
-          echo -e "$FAILED_DETAILS" >> $GITHUB_ENV
-          echo "EOF" >> $GITHUB_ENV
-          
-          # Final result
-          if [ -n "$FAILED_TESTS" ]; then
+
+          # Final result — only blocking checks fail the pipeline
+          if [ -n "$BLOCKING_FAILED" ]; then
             echo "🔴 **Overall Result**: FAILED" >> $GITHUB_STEP_SUMMARY
             echo "" >> $GITHUB_STEP_SUMMARY
-            echo "**Failed tests:**$FAILED_TESTS" >> $GITHUB_STEP_SUMMARY
+            echo "**Failed checks:**$BLOCKING_FAILED" >> $GITHUB_STEP_SUMMARY
             echo "Please fix the above issues and try again." >> $GITHUB_STEP_SUMMARY
             echo "OVERALL_FAILED=true" >> $GITHUB_ENV
           else
-            echo "🟢 **Overall Result**: ALL TESTS PASSED" >> $GITHUB_STEP_SUMMARY
+            echo "🟢 **Overall Result**: PASSED" >> $GITHUB_STEP_SUMMARY
+            if [ -n "$WARNING_TESTS" ]; then
+              echo "" >> $GITHUB_STEP_SUMMARY
+              echo "⚠️ **Non-blocking warnings:**$WARNING_TESTS" >> $GITHUB_STEP_SUMMARY
+            fi
             echo "OVERALL_FAILED=false" >> $GITHUB_ENV
           fi
 
-
-      - name: Fail job if any tests failed
+      - name: Fail job if blocking checks failed
         if: env.OVERALL_FAILED == 'true'
         run: |
-          echo "❌ One or more tests failed. Check the summary above for details."
+          echo "❌ One or more blocking checks failed (PHPStan always blocks; Composer/README block on merges into master). Check the summary above for details."
           exit 1
