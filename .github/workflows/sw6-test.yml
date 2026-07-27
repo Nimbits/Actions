@@ -429,6 +429,7 @@ jobs:
             IS_MASTER_MERGE="true"
           fi
           echo "ℹ️ Target branch: ${{ github.base_ref || github.ref_name }} (composer/readme blocking: $IS_MASTER_MERGE)"
+          echo "IS_MASTER_MERGE=$IS_MASTER_MERGE" >> $GITHUB_ENV
 
           # --- Composer / README (blocking only for merges into master) ---
           if [ "${{ env.COMPOSER_CHECK_FAILED }}" = "true" ]; then
@@ -495,6 +496,73 @@ jobs:
             fi
             echo "OVERALL_FAILED=false" >> $GITHUB_ENV
           fi
+
+      - name: Comment test results on PR
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const marker = '<!-- nimbits-test-results -->';
+            const failed = (v) => process.env[v] === 'true';
+            const isMasterMerge = failed('IS_MASTER_MERGE');
+            const overallFailed = failed('OVERALL_FAILED');
+
+            const row = (name, isFailed, blocking) => {
+              const status = !isFailed ? '✅ Passed' : (blocking ? '❌ Failed' : '⚠️ Warnings');
+              return `| ${name} | ${status} | ${blocking ? 'blocking' : 'non-blocking'} |`;
+            };
+
+            const rows = [
+              row('PHPStan', failed('PHPSTAN_FAILED'), true),
+              row('Composer Version', failed('COMPOSER_CHECK_FAILED'), isMasterMerge),
+              row('README Update', failed('README_CHECK_FAILED'), isMasterMerge),
+              row('ESLint', failed('ESLINT_FAILED'), false),
+              row('Stylelint', failed('STYLELINT_FAILED'), false),
+            ];
+
+            const overallEmoji = overallFailed ? '🔴' : '🟢';
+            const overallText = overallFailed ? 'FAILED' : 'PASSED';
+
+            const commentBody = `${marker}
+            ## ${overallEmoji} Test Results: ${overallText}
+
+            | Check | Result | Mode |
+            |-------|--------|------|
+            ${rows.join('\n')}
+
+            ${isMasterMerge ? '' : '_ℹ️ Composer/README checks only block on merges into master/main._'}
+            ${overallFailed ? '\n❌ **Please fix the blocking checks before merging.**' : ''}
+
+            <sub>Run: [#${context.runNumber}](${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}) · Commit: \`${context.sha.substring(0, 7)}\`</sub>`;
+
+            // Find existing test results comment via marker
+            const comments = await github.rest.issues.listComments({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+            });
+
+            const botComment = comments.data.find(comment =>
+              comment.user.type === 'Bot' &&
+              comment.body.includes(marker)
+            );
+
+            if (botComment) {
+              await github.rest.issues.updateComment({
+                comment_id: botComment.id,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                body: commentBody
+              });
+            } else {
+              await github.rest.issues.createComment({
+                issue_number: context.issue.number,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                body: commentBody
+              });
+            }
 
       - name: Fail job if blocking checks failed
         if: env.OVERALL_FAILED == 'true'
