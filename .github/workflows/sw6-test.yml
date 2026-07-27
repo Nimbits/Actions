@@ -25,7 +25,7 @@ on:
       cli-branch:
         description: 'CLI branch to use for configs'
         required: false
-        default: 'linters'
+        default: 'master'
         type: string
     secrets:
       CURR_VAULT_PATH:
