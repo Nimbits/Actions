@@ -364,49 +364,55 @@ jobs:
           fi
 
       - name: Run ESLint (non-blocking)
-        continue-on-error: true
         id: eslint
         run: |
           echo "🔍 Running ESLint analysis..."
-          # Check if JS/Vue files exist
-          if find . -name "*.js" -o -name "*.vue" | grep -v node_modules | grep -v vendor | head -1 | read; then
-            echo "Found JS/Vue files, running ESLint..."
-            # Run ESLint from project root with correct config path
+          ESLINT_FAILED=false
+          # Check if JS/Vue files exist in plugin source
+          if find src -name "*.js" -o -name "*.vue" 2>/dev/null | grep -v node_modules | grep -v vendor | grep -v dist | head -1 | read; then
+            echo "Found JS/Vue files in src/, running ESLint..."
+            set +e
             npx --prefix .github/lint-configs eslint \
               --config=.github/lint-configs/eslint.config.js \
-              .
-            echo "ESLINT_FAILED=false" >> $GITHUB_ENV
+              --no-error-on-unmatched-pattern \
+              src/
+            ESLINT_EXIT=$?
+            set -e
+            if [ $ESLINT_EXIT -ne 0 ]; then
+              echo "⚠️ ESLint found issues (exit code $ESLINT_EXIT) - non-blocking"
+              ESLINT_FAILED=true
+            fi
           else
             echo "No JS/Vue files found to lint"
-            echo "ESLINT_FAILED=false" >> $GITHUB_ENV
           fi
-
-      - name: Set ESLint result
-        if: steps.eslint.outcome == 'failure'
-        run: echo "ESLINT_FAILED=true" >> $GITHUB_ENV
+          echo "ESLINT_FAILED=$ESLINT_FAILED" >> $GITHUB_ENV
+          exit 0
 
       - name: Run Stylelint (non-blocking)
-        continue-on-error: true
         id: stylelint
         run: |
           echo "🔍 Running Stylelint analysis..."
-          # Check if CSS/SCSS files exist
-          if find . -name "*.css" -o -name "*.scss" -o -name "*.sass" | grep -v node_modules | grep -v vendor | head -1 | read; then
-            echo "Found CSS/SCSS files, running Stylelint..."
-            # Run Stylelint from project root with correct config path
+          STYLELINT_FAILED=false
+          # Check if CSS/SCSS files exist in plugin source
+          if find src -name "*.css" -o -name "*.scss" -o -name "*.sass" 2>/dev/null | grep -v node_modules | grep -v vendor | grep -v dist | head -1 | read; then
+            echo "Found CSS/SCSS files in src/, running Stylelint..."
+            set +e
             npx --prefix .github/lint-configs stylelint \
               --config=.github/lint-configs/.stylelintrc.json \
               --ignore-path=.github/lint-configs/.stylelintignore \
-              "**/*.{css,scss,sass}"
-            echo "STYLELINT_FAILED=false" >> $GITHUB_ENV
+              --allow-empty-input \
+              "src/**/*.{css,scss,sass}"
+            STYLELINT_EXIT=$?
+            set -e
+            if [ $STYLELINT_EXIT -ne 0 ]; then
+              echo "⚠️ Stylelint found issues (exit code $STYLELINT_EXIT) - non-blocking"
+              STYLELINT_FAILED=true
+            fi
           else
             echo "No CSS/SCSS files found to lint"
-            echo "STYLELINT_FAILED=false" >> $GITHUB_ENV
           fi
-
-      - name: Set Stylelint result
-        if: steps.stylelint.outcome == 'failure'
-        run: echo "STYLELINT_FAILED=true" >> $GITHUB_ENV
+          echo "STYLELINT_FAILED=$STYLELINT_FAILED" >> $GITHUB_ENV
+          exit 0
 
       - name: Test Results Summary
         run: |
