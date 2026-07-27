@@ -164,13 +164,3 @@ jobs:
           status: ${{ job.status }}
           env: ${{ steps.deployment.outputs.env }}
           deployment_id: ${{ steps.deployment.outputs.deployment_id }}
-
-      - name: Notify teams on failure
-        if: failure()
-        uses: jdcargile/ms-teams-notification@v1.4
-        with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          ms-teams-webhook-uri: ${{ env.MS_TEAMS_WEBHOOK_URI }}
-          notification-summary: ${{ inputs.is_prod && '[PROD] Deployment failed!' || 'Deployment to Dev-Environment failed.' }}
-          notification-color: ${{ inputs.is_prod && 'F85149' || 'F88F49' }}  # Red / Orange
-          timezone: Europe/Berlin
