@@ -49,24 +49,3 @@ jobs:
           asset_name: ${{ inputs.repo_name }}.zip
           tag: ${{ github.ref_name }}
           overwrite: false
-
-      - name: Fetch secrets from Vault for testing
-        id: fetch_secrets
-        if: failure()
-        uses: hashicorp/vault-action@v2.7.4
-        with:
-          url: ${{ vars.VAULT_SERVER }}
-          method: token
-          token: ${{ secrets.CURR_VAULT_TOKEN }}
-          secrets: |
-            ${{ secrets.CURR_VAULT_PATH }} ms_teams_webhook_uri | MS_TEAMS_WEBHOOK_URI
-
-      - name: Notify teams on failure
-        if: failure()
-        uses: jdcargile/ms-teams-notification@v1.4
-        with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          ms-teams-webhook-uri: ${{ env.MS_TEAMS_WEBHOOK_URI }}
-          notification-summary: 'Release failed!'
-          notification-color: 'F85149'  # Red 
-          timezone: Europe/Berlin
